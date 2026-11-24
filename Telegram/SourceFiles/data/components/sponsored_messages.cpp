@@ -102,7 +102,7 @@ void SponsoredMessages::clearOldRequests() {
 }
 
 SponsoredMessages::AppendResult SponsoredMessages::append(
-		not_null<History*> history) {
+		not_null<History*>) {
 	return SponsoredMessages::AppendResult::None;
 }
 
@@ -273,15 +273,15 @@ HistoryItem *SponsoredMessages::injectItem(
 	return entryIt->item.get();
 }
 
-bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
+bool SponsoredMessages::canHaveFor(not_null<History*>) const {
 	return false;
 }
 
-bool SponsoredMessages::canHaveFor(not_null<HistoryItem*> item) const {
+bool SponsoredMessages::canHaveFor(not_null<HistoryItem*>) const {
 	return false;
 }
 
-bool SponsoredMessages::isTopBarFor(not_null<History*> history) const {
+bool SponsoredMessages::isTopBarFor(not_null<History*>) const {
 	return false;
 }
 
@@ -688,7 +688,7 @@ void SponsoredMessages::view(const FullMsgId &fullId) {
 	view(entryPtr->sponsored.randomId);
 }
 
-void SponsoredMessages::view(const QByteArray &randomId) {
+void SponsoredMessages::view(const QByteArray &) {
 }
 
 SponsoredMessages::Details SponsoredMessages::lookupDetails(
