@@ -20,6 +20,10 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
 permissions:
   contents: write
 
@@ -36,6 +40,7 @@ jobs:
       - name: Initialize build environment
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $buildConfig = if ('${{ github.event_name }}' -eq 'push') {
             'Release'
           } elseif ('${{ inputs.config }}') {
@@ -45,20 +50,54 @@ jobs:
           }
           $enableLto = if ('${{ inputs.enable_lto }}' -eq 'true') { 'ON' } else { 'OFF' }
           $prepareFlags = if ($buildConfig -eq 'Debug') { 'skip-release silent qt6' } else { 'silent qt6' }
-          $tbuild = if (Test-Path 'D:\') { 'D:\TBuild' } else { Join-Path $env:USERPROFILE 'TBuild' }
-          New-Item -ItemType Directory -Force -Path (Join-Path $tbuild 'Libraries') | Out-Null
+
+          $cFree = (Get-PSDrive -Name C).Free
+          $dDrive = Get-PSDrive -Name D -ErrorAction SilentlyContinue
+          $dFree = if ($dDrive) { $dDrive.Free } else { 0 }
+          Write-Host ("Free disk space - C: {0:N1} GB, D: {1:N1} GB" -f ($cFree / 1GB), ($dFree / 1GB))
+
+          $realTbuild = if ($dFree -gt $cFree) { 'D:\TBuild' } else { Join-Path $env:USERPROFILE 'TBuild' }
+          New-Item -ItemType Directory -Force -Path (Join-Path $realTbuild 'Libraries\win64'), (Join-Path $realTbuild 'ThirdParty') | Out-Null
+
+          $wsTbuild = Join-Path $env:GITHUB_WORKSPACE 'TBuild'
+          if (Test-Path -LiteralPath $wsTbuild) {
+            cmd /c rmdir "$wsTbuild"
+          }
+          cmd /c mklink /d "$wsTbuild" "$realTbuild"
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $wsTbuild)) {
+            throw "Failed to create directory symlink $wsTbuild -> $realTbuild"
+          }
 
           "BUILD_CONFIG=$buildConfig" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "ENABLE_LTO=$enableLto" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PREPARE_FLAGS=$prepareFlags" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "TBUILD=$tbuild" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "LibrariesPath=$tbuild\Libraries\win64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TBUILD=$wsTbuild" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LibrariesPath=$wsTbuild\Libraries\win64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Checkout KazeGram with submodules
+      - name: Configure Git auth for TBuild symlink
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          BASIC="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          echo "::add-mask::$BASIC"
+          echo "GIT_AUTH_HEADER=AUTHORIZATION: basic $BASIC" >> "$GITHUB_ENV"
+
+      - name: Checkout KazeGram
         uses: actions/checkout@v7
+        env:
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0: ${{ env.GIT_AUTH_HEADER }}
         with:
-          submodules: recursive
-          path: ${{ env.TBUILD }}\tdesktop
+          path: TBuild\tdesktop
+
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git config --global core.longpaths true
+          cd "$TBUILD/tdesktop"
+          git submodule update --init --recursive --depth=1
 
       - name: Compute SDK and cache keys
         shell: bash
@@ -75,7 +114,6 @@ jobs:
 
           git config --global user.email "ci@kazegram.local"
           git config --global user.name "KazeGram CI"
-          git config --global core.longpaths true
 
       - name: Setup MSVC 14.44 x64 environment
         uses: Eden-CI/msvc-dev-cmd@master
@@ -84,20 +122,57 @@ jobs:
           sdk: ${{ env.SDK }}
           toolset: '14.44'
 
+      - name: Ensure Visual Studio ATL component
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $atlInclude = Join-Path $env:VCToolsInstallDir 'atlmfc\include'
+          $header = Join-Path $atlInclude 'atlbase.h'
+          if (Test-Path -LiteralPath $header) {
+            Write-Host "ATL already present at $atlInclude"
+            exit 0
+          }
+
+          Write-Host "ATL missing in $env:VCToolsInstallDir; installing ATL via Visual Studio Installer..."
+          $setup = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
+          if (-not (Test-Path -LiteralPath $setup)) {
+            throw "Visual Studio Installer setup.exe not found at $setup"
+          }
+          $vsPath = $env:VSINSTALLDIR.TrimEnd('\')
+          $proc = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+            'modify',
+            '--installPath', "`"$vsPath`"",
+            '--add', 'Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL',
+            '--quiet', '--norestart', '--nocache'
+          )
+          if ($proc.ExitCode -notin @(0, 3010)) {
+            throw "Visual Studio Installer exited with code $($proc.ExitCode)"
+          }
+          if (-not (Test-Path -LiteralPath $header)) {
+            throw "ATL installation finished but $header is still missing"
+          }
+          $atlLib = Join-Path $env:VCToolsInstallDir 'atlmfc\lib\x64'
+          "INCLUDE=$atlInclude;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LIB=$atlLib;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Configure NuGet sources
         run: |
           nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
           nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
 
-      - name: Cache ThirdParty tools
-        uses: actions/cache@v6
+      - name: Restore ThirdParty cache
+        id: cache-thirdparty
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.TBUILD }}\ThirdParty
           key: ${{ runner.OS }}-${{ runner.arch }}-thirdparty-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ runner.arch }}-thirdparty-
+          restore-keys: |
+            ${{ runner.OS }}-${{ runner.arch }}-thirdparty-${{ env.CACHE_KEY }}-
+            ${{ runner.OS }}-${{ runner.arch }}-thirdparty-
 
-      - name: Cache Libraries (${{ env.BUILD_CONFIG }})
-        uses: actions/cache@v6
+      - name: Restore Libraries cache (${{ env.BUILD_CONFIG }})
+        id: cache-libs
+        uses: actions/cache/restore@v6
         with:
           path: |
             ${{ env.LibrariesPath }}\*
@@ -106,25 +181,115 @@ jobs:
             ${{ env.LibrariesPath }}\cache_keys\*
             !${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
           key: ${{ runner.OS }}-x64-libs-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-x64-libs-${{ env.BUILD_CONFIG }}-
+          restore-keys: |
+            ${{ runner.OS }}-x64-libs-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}-
+            ${{ runner.OS }}-x64-libs-${{ env.BUILD_CONFIG }}-
 
-      - name: Cache Qt6 (${{ env.BUILD_CONFIG }})
-        uses: actions/cache@v6
+      - name: Restore Qt6 cache (${{ env.BUILD_CONFIG }})
+        id: cache-qt6
+        uses: actions/cache/restore@v6
         with:
           path: |
             ${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
           key: ${{ runner.OS }}-x64-qt6-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-x64-qt6-${{ env.BUILD_CONFIG }}-
+          restore-keys: |
+            ${{ runner.OS }}-x64-qt6-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}-
+            ${{ runner.OS }}-x64-qt6-${{ env.BUILD_CONFIG }}-
 
       - name: Prepare dependencies
+        id: prepare
+        timeout-minutes: 270
+        continue-on-error: true
         run: |
           call "%TBUILD%\tdesktop\Telegram\build\prepare\win.bat" %PREPARE_FLAGS%
+
+      - name: Finalize dependency directories for caching
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $outcome = '${{ steps.prepare.outcome }}'
+          $tpRoot = Join-Path $env:TBUILD 'ThirdParty'
+          $tpKeys = Join-Path $tpRoot 'cache_keys'
+          $libKeys = Join-Path $env:LibrariesPath 'cache_keys'
+
+          if ($outcome -ne 'success') {
+            Write-Host "Prepare outcome is '$outcome'; cleaning incomplete stage directories before saving partial cache..."
+            if (Test-Path -LiteralPath $tpRoot) {
+              Get-ChildItem -LiteralPath $tpRoot -Directory | Where-Object { $_.Name -ne 'cache_keys' } | ForEach-Object {
+                if (-not (Test-Path -LiteralPath (Join-Path $tpKeys $_.Name))) {
+                  Write-Host "Removing incomplete ThirdParty stage: $($_.Name)"
+                  Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                }
+              }
+            }
+            if (Test-Path -LiteralPath $env:LibrariesPath) {
+              $hasQtKey = [bool](Get-Item -Path (Join-Path $libKeys 'qt_*') -ErrorAction SilentlyContinue)
+              Get-ChildItem -LiteralPath $env:LibrariesPath -Directory | Where-Object { $_.Name -notin @('cache_keys', 'local') } | ForEach-Object {
+                if ($_.Name -like 'Qt-*') {
+                  if (-not $hasQtKey) {
+                    Write-Host "Removing incomplete Qt install directory: $($_.Name)"
+                    Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                  }
+                } elseif (-not (Test-Path -LiteralPath (Join-Path $libKeys $_.Name))) {
+                  Write-Host "Removing incomplete Libraries stage: $($_.Name)"
+                  Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                }
+              }
+            }
+            $suffix = "-partial-${{ github.run_id }}-${{ github.run_attempt }}"
+          } else {
+            $suffix = ''
+          }
+
+          $tpReady = if (Get-ChildItem -Path $tpKeys -File -ErrorAction SilentlyContinue) { 'true' } else { 'false' }
+          $libsReady = if (Get-ChildItem -Path $libKeys -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike 'qt_*' }) { 'true' } else { 'false' }
+          $qtReady = if (Get-Item -Path (Join-Path $libKeys 'qt_*') -ErrorAction SilentlyContinue) { 'true' } else { 'false' }
+
+          "CACHE_SAVE_SUFFIX=$suffix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "THIRDPARTY_READY=$tpReady" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LIBS_READY=$libsReady" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "QT_READY=$qtReady" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Trim intermediate dependency files to free disk space
         shell: bash
         run: |
-          find "$LibrariesPath" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+          find "$LibrariesPath" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' -o -path '*/qt6_windows7/*' -o -path '*/gas-preprocessor/*' -o -path '*/src/wallet_engine/*' -o '(' '(' -path '*/tlottie/*' -o -path '*/wallet-engine/*' ')' ! -path '*/target/*' ')' ')' -type f ')' -o '(' -empty ! -path '*/tlottie/*' ! -path '*/wallet-engine/*' ')' ')' -delete
+
+      - name: Save ThirdParty cache
+        if: steps.cache-thirdparty.outputs.cache-hit != 'true' && env.THIRDPARTY_READY == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: ${{ runner.OS }}-${{ runner.arch }}-thirdparty-${{ env.CACHE_KEY }}${{ env.CACHE_SAVE_SUFFIX }}
+
+      - name: Save Libraries cache (${{ env.BUILD_CONFIG }})
+        if: steps.cache-libs.outputs.cache-hit != 'true' && env.LIBS_READY == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ env.LibrariesPath }}\*
+            !${{ env.LibrariesPath }}\cache_keys
+            !${{ env.LibrariesPath }}\[qQ]t[_-]*
+            ${{ env.LibrariesPath }}\cache_keys\*
+            !${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
+          key: ${{ runner.OS }}-x64-libs-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}${{ env.CACHE_SAVE_SUFFIX }}
+
+      - name: Save Qt6 cache (${{ env.BUILD_CONFIG }})
+        if: steps.cache-qt6.outputs.cache-hit != 'true' && env.QT_READY == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ env.LibrariesPath }}\[qQ]t[_-]*
+            ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
+          key: ${{ runner.OS }}-x64-qt6-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}${{ env.CACHE_SAVE_SUFFIX }}
+
+      - name: Verify dependency preparation succeeded
+        if: steps.prepare.outcome != 'success'
+        shell: pwsh
+        run: |
+          Write-Error "Dependency preparation did not finish in a single pass (outcome: ${{ steps.prepare.outcome }}). Completed stages were saved to GitHub Actions cache — re-run the workflow to continue from cache."
+          exit 1
 
       - name: Resolve Telegram API credentials
         shell: pwsh
@@ -149,7 +314,9 @@ jobs:
             qt6 ^
             %TDESKTOP_BUILD_API% ^
             -D CMAKE_CONFIGURATION_TYPES=%BUILD_CONFIG% ^
-            -D DESKTOP_APP_ENABLE_LTO=%ENABLE_LTO%
+            -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
+            -D CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=%ENABLE_LTO%
+          if errorlevel 1 exit /b %errorlevel%
           cmake --build ..\out --config %BUILD_CONFIG% --target Telegram --parallel
 
       - name: Package portable archive

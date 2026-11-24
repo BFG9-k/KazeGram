@@ -6,7 +6,7 @@
 
 add_executable(Telegram WIN32 MACOSX_BUNDLE)
 init_non_host_target(Telegram)
-if (MSVC)
+if (MSVC AND NOT "${CMAKE_MSVC_DEBUG_INFORMATION_FORMAT}" STREQUAL "")
     set_property(TARGET Telegram PROPERTY MSVC_DEBUG_INFORMATION_FORMAT Embedded)
 endif()
 
