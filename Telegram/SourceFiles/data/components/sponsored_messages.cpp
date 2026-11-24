@@ -103,35 +103,7 @@ void SponsoredMessages::clearOldRequests() {
 
 SponsoredMessages::AppendResult SponsoredMessages::append(
 		not_null<History*> history) {
-	if (isTopBarFor(history)) {
-		return SponsoredMessages::AppendResult::None;
-	}
-	const auto it = _data.find(history);
-	if (it == end(_data)) {
-		return SponsoredMessages::AppendResult::None;
-	}
-	auto &list = it->second;
-	if (list.showedAll
-		|| !TooEarlyForRequest(list.received)
-		|| list.postsBetween) {
-		return SponsoredMessages::AppendResult::None;
-	}
-
-	const auto entryIt = ranges::find_if(list.entries, [](const Entry &e) {
-		return e.item == nullptr;
-	});
-	if (entryIt == end(list.entries)) {
-		list.showedAll = true;
-		return SponsoredMessages::AppendResult::None;
-	} else if (entryIt->preload) {
-		return SponsoredMessages::AppendResult::MediaLoading;
-	}
-	entryIt->item.reset(history->addSponsoredMessage(
-		entryIt->itemFullId.msg,
-		entryIt->sponsored.from,
-		entryIt->sponsored.textWithEntities));
-
-	return SponsoredMessages::AppendResult::Appended;
+	return SponsoredMessages::AppendResult::None;
 }
 
 void SponsoredMessages::inject(
@@ -302,25 +274,14 @@ HistoryItem *SponsoredMessages::injectItem(
 }
 
 bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
-	if (history->peer->isChannel()) {
-		return true;
-	} else if (const auto user = history->peer->asUser()) {
-		return user->isBot();
-	}
 	return false;
 }
 
 bool SponsoredMessages::canHaveFor(not_null<HistoryItem*> item) const {
-	return item->history()->peer->isBroadcast()
-		&& item->isRegular();
+	return false;
 }
 
 bool SponsoredMessages::isTopBarFor(not_null<History*> history) const {
-	if (peerIsUser(history->peer->id)) {
-		if (const auto user = history->peer->asUser()) {
-			return user->isBot();
-		}
-	}
 	return false;
 }
 
@@ -728,19 +689,6 @@ void SponsoredMessages::view(const FullMsgId &fullId) {
 }
 
 void SponsoredMessages::view(const QByteArray &randomId) {
-	auto &request = _viewRequests[randomId];
-	if (request.requestId || TooEarlyForRequest(request.lastReceived)) {
-		return;
-	}
-	request.requestId = _session->api().request(
-		MTPmessages_ViewSponsoredMessage(MTP_bytes(randomId))
-	).done([=] {
-		auto &request = _viewRequests[randomId];
-		request.lastReceived = crl::now();
-		request.requestId = 0;
-	}).fail([=] {
-		_viewRequests.remove(randomId);
-	}).send();
 }
 
 SponsoredMessages::Details SponsoredMessages::lookupDetails(
@@ -788,16 +736,9 @@ void SponsoredMessages::clicked(
 }
 
 void SponsoredMessages::clicked(
-		const QByteArray &randomId,
-		bool isMedia,
-		bool isFullscreen) {
-	using Flag = MTPmessages_ClickSponsoredMessage::Flag;
-	_session->api().request(MTPmessages_ClickSponsoredMessage(
-		MTP_flags(Flag(0)
-			| (isMedia ? Flag::f_media : Flag(0))
-			| (isFullscreen ? Flag::f_fullscreen : Flag(0))),
-		MTP_bytes(randomId)
-	)).send();
+		const QByteArray &,
+		bool,
+		bool) {
 }
 
 SponsoredReportAction SponsoredMessages::createReportCallback(

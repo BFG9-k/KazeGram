@@ -131,7 +131,7 @@ void PromoSuggestions::refreshTopPromotion() {
 					|= _dismissedSuggestions.emplace(qs(suggestion)).second;
 			}
 
-			if (const auto peer = data.vpeer()) {
+			if (const auto peer = data.vpeer(); peer && !data.is_proxy()) {
 				const auto peerId = peerFromMTP(*peer);
 				const auto history = _session->data().history(peerId);
 				setTopPromoted(
