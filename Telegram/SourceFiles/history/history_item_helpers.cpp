@@ -983,9 +983,6 @@ MessageFlags FlagsFromMTP(
 			: (flags & MTP::f_paid_suggested_post_stars)
 			? Flag::StarsPaidSuggested
 			: Flag())
-		| ((flags & MTP::f_summary_from_language)
-			? Flag::CanBeSummarized
-			: Flag())
 		| ((flags & MTP::f_guestchat_via_from)
 			? Flag::GuestChatViaFrom
 			: Flag());

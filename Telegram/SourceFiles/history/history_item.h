@@ -34,10 +34,6 @@ class ReplyKeyboard;
 struct LanguageId;
 enum class SuggestionActions : uchar;
 
-namespace Api {
-struct SummaryEntry;
-} // namespace Api
-
 namespace base {
 template <typename Enum>
 class enum_mask;
@@ -229,8 +225,6 @@ public:
 	void setFactcheck(MessageFactcheck info);
 	[[nodiscard]] bool hasUnrequestedFactcheck() const;
 	[[nodiscard]] TextWithEntities factcheckText() const;
-	[[nodiscard]] const Api::SummaryEntry &summaryEntry() const;
-	void setHasSummaryEntry();
 
 	[[nodiscard]] not_null<Data::Thread*> notificationThread() const;
 	[[nodiscard]] Data::Thread *maybeNotificationThread() const;
@@ -367,9 +361,6 @@ public:
 	}
 	[[nodiscard]] bool showSimilarChannels() const {
 		return _flags & MessageFlag::ShowSimilarChannels;
-	}
-	[[nodiscard]] bool canBeSummarized() const {
-		return _flags & MessageFlag::CanBeSummarized;
 	}
 	[[nodiscard]] bool textAppearing() const {
 		return _flags & MessageFlag::TextAppearing;
