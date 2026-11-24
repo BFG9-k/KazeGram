@@ -1528,6 +1528,10 @@ PRIVATE
     iv/iv_rich_message_serializer.h
     iv/iv_rich_page.cpp
     iv/iv_rich_page.h
+    kazegram/kazegram_icon.cpp
+    kazegram/kazegram_icon.h
+    kazegram/kazegram_settings.cpp
+    kazegram/kazegram_settings.h
     iv/iv_rich_page_quote.cpp
     iv/iv_rich_page_quote.h
     iv/iv_rich_page_quote_builder.cpp
@@ -1973,6 +1977,8 @@ PRIVATE
     settings/sections/settings_information.h
     settings/settings_intro.cpp
     settings/settings_intro.h
+    settings/sections/settings_kazegram.cpp
+    settings/sections/settings_kazegram.h
     settings/sections/settings_local_passcode.cpp
     settings/sections/settings_local_passcode.h
     settings/sections/settings_local_storage.cpp
@@ -2671,6 +2677,12 @@ PRIVATE
     langs/cloud_lang.strings
     numbers.txt
 )
+
+if (WIN32)
+    set_source_files_properties(${res_loc}/winrc/Telegram.rc PROPERTIES
+        OBJECT_DEPENDS ${res_loc}/art/icon256.ico
+    )
+endif()
 
 include(cmake/qrhi_shaders.cmake)
 include(cmake/generate_models.cmake)

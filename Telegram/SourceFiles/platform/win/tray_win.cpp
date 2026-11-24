@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt_signal_producer.h"
 #include "core/application.h"
 #include "core/version.h"
+#include "kazegram/kazegram_icon.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "storage/localstorage.h"
@@ -86,21 +87,6 @@ bool DarkTasbarValueValid/* = false*/;
 	return use;
 }
 
-[[nodiscard]] QImage MonochromeWithDot(QImage image, style::color color) {
-	auto p = QPainter(&image);
-	auto hq = PainterHighQualityEnabler(p);
-	const auto xm = image.width() / 16.;
-	const auto ym = image.height() / 16.;
-	p.setBrush(color);
-	p.setPen(Qt::NoPen);
-	p.drawEllipse(QRectF( // cx=3.9, cy=12.7, r=2.2
-		1.7 * xm,
-		10.5 * ym,
-		4.4 * xm,
-		4.4 * ym));
-	return image;
-}
-
 [[nodiscard]] QImage ImageIconWithCounter(
 		Window::CounterLayerArgs &&args,
 		bool supportMode,
@@ -110,6 +96,14 @@ bool DarkTasbarValueValid/* = false*/;
 	static auto ScaledLogoNoMargin = base::flat_map<int, QImage>();
 	static auto ScaledLogoDark = base::flat_map<int, QImage>();
 	static auto ScaledLogoLight = base::flat_map<int, QImage>();
+	static auto CachedColorKey = uint64(0);
+
+	const auto nowKey = KazeGram::CurrentIconCacheKey();
+	if (CachedColorKey != nowKey) {
+		CachedColorKey = nowKey;
+		ScaledLogo.clear();
+		ScaledLogoNoMargin.clear();
+	}
 
 	const auto darkMode = IsDarkTaskbar();
 	auto &scaled = (monochrome && darkMode)
@@ -128,10 +122,7 @@ bool DarkTasbarValueValid/* = false*/;
 		}
 		return scaled.emplace(
 			args.size,
-			(smallIcon
-				? Window::LogoNoMargin()
-				: Window::Logo()
-			).scaledToWidth(args.size, Qt::SmoothTransformation)
+			KazeGram::RenderKazeIcon(args.size, !smallIcon)
 		).first->second;
 	}();
 	if ((!monochrome || !darkMode) && supportMode) {
@@ -141,7 +132,7 @@ bool DarkTasbarValueValid/* = false*/;
 		return result;
 	} else if (smallIcon) {
 		if (monochrome && darkMode) {
-			return MonochromeWithDot(std::move(result), args.bg);
+			return result;
 		}
 		return Window::WithSmallCounter(std::move(result), std::move(args));
 	}
@@ -223,8 +214,8 @@ void Tray::updateIcon() {
 		Tray::IconWithCounter(
 			CounterLayerArgs(
 				GetSystemMetrics(SM_CXSMICON),
-				Core::App().unreadBadge(),
-				Core::App().unreadBadgeMuted()),
+				0,
+				false),
 			true,
 			Core::App().settings().trayIconMonochrome(),
 			session && session->supportMode()));

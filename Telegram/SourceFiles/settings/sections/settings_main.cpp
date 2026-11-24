@@ -57,7 +57,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_credits.h"
 #include "settings/sections/settings_folders.h"
 #include "settings/sections/settings_information.h"
+#include "settings/sections/settings_kazegram.h"
 #include "settings/sections/settings_notifications.h"
+#include "kazegram/kazegram_settings.h"
 #include "settings/settings_power_saving.h"
 #include "settings/sections/settings_premium.h"
 #include "settings/sections/settings_privacy_security.h"
@@ -365,6 +367,17 @@ void BuildSectionButtons(SectionBuilder &builder) {
 	const auto session = builder.session();
 	const auto controller = builder.controller();
 	const auto showOther = builder.showOther();
+
+	builder.addButton({
+		.id = u"main/kazegram"_q,
+		.title = ::KazeGram::Tr(u"Настройки KazeGram"_q, u"KazeGram Settings"_q),
+		.icon = { &st::menuIconChangeColors },
+		.onClick = [=] { showOther(KazeGramId()); },
+		.keywords = { u"kazegram"_q, u"icon"_q, u"color"_q, u"иконка"_q, u"цвет"_q },
+	});
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
 
 	if (!session->supportMode()) {
 		builder.addButton({

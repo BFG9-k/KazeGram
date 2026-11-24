@@ -49,6 +49,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "mainwidget.h" // session->content()->windowShown().
 #include "tray.h"
+#include "kazegram/kazegram_icon.h"
+#include "kazegram/kazegram_settings.h"
 #include "styles/style_window.h"
 #include "styles/style_dialogs.h" // ChildSkip().x() for new child windows.
 
@@ -142,13 +144,25 @@ const char kOptionNewWindowsSizeAsFirst[] = "new-windows-size-as-first";
 const char kOptionDisableTouchbar[] = "touchbar-disabled";
 
 const QImage &Logo() {
-	static const auto result = QImage(u":/gui/art/logo_256.png"_q);
-	return result;
+	static auto CachedKey = uint64(0);
+	static auto Result = QImage();
+	const auto key = KazeGram::CurrentIconCacheKey();
+	if (CachedKey != key || Result.isNull()) {
+		CachedKey = key;
+		Result = KazeGram::RenderKazeIcon(256, true);
+	}
+	return Result;
 }
 
 const QImage &LogoNoMargin() {
-	static const auto result = QImage(u":/gui/art/logo_256_no_margin.png"_q);
-	return result;
+	static auto CachedKey = uint64(0);
+	static auto Result = QImage();
+	const auto key = KazeGram::CurrentIconCacheKey();
+	if (CachedKey != key || Result.isNull()) {
+		CachedKey = key;
+		Result = KazeGram::RenderKazeIcon(256, false);
+	}
+	return Result;
 }
 
 void ConvertIconToBlack(QImage &image) {
@@ -440,6 +454,11 @@ MainWindow::MainWindow(not_null<Controller*> controller)
 
 	if (isPrimary()) {
 		Ui::Toast::SetDefaultParent(_body.data());
+
+		KazeGram::AppSettings().iconVisualChanges(
+		) | rpl::on_next([=] {
+			KazeGram::RefreshAllAppIcons();
+		}, lifetime());
 	}
 
 	windowActiveValue(
