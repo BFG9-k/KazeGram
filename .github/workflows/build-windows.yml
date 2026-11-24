@@ -73,6 +73,7 @@ jobs:
           "PREPARE_FLAGS=$prepareFlags" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "TBUILD=$wsTbuild" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "LibrariesPath=$wsTbuild\Libraries\win64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MSBUILDDISABLENODEREUSE=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Configure Git auth for TBuild symlink
         shell: bash
@@ -205,6 +206,7 @@ jobs:
           call "%TBUILD%\tdesktop\Telegram\build\prepare\win.bat" %PREPARE_FLAGS%
 
       - name: Finalize dependency directories for caching
+        if: always()
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -252,19 +254,20 @@ jobs:
           "QT_READY=$qtReady" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Trim intermediate dependency files to free disk space
+        if: always()
         shell: bash
         run: |
           find "$LibrariesPath" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' -o -path '*/qt6_windows7/*' -o -path '*/gas-preprocessor/*' -o -path '*/src/wallet_engine/*' -o '(' '(' -path '*/tlottie/*' -o -path '*/wallet-engine/*' ')' ! -path '*/target/*' ')' ')' -type f ')' -o '(' -empty ! -path '*/tlottie/*' ! -path '*/wallet-engine/*' ')' ')' -delete
 
       - name: Save ThirdParty cache
-        if: steps.cache-thirdparty.outputs.cache-hit != 'true' && env.THIRDPARTY_READY == 'true'
+        if: (success() || failure() || cancelled()) && steps.cache-thirdparty.outputs.cache-hit != 'true' && env.THIRDPARTY_READY == 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ env.TBUILD }}\ThirdParty
           key: ${{ runner.OS }}-${{ runner.arch }}-thirdparty-${{ env.CACHE_KEY }}${{ env.CACHE_SAVE_SUFFIX }}
 
       - name: Save Libraries cache (${{ env.BUILD_CONFIG }})
-        if: steps.cache-libs.outputs.cache-hit != 'true' && env.LIBS_READY == 'true'
+        if: (success() || failure() || cancelled()) && steps.cache-libs.outputs.cache-hit != 'true' && env.LIBS_READY == 'true'
         uses: actions/cache/save@v6
         with:
           path: |
@@ -276,7 +279,7 @@ jobs:
           key: ${{ runner.OS }}-x64-libs-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}${{ env.CACHE_SAVE_SUFFIX }}
 
       - name: Save Qt6 cache (${{ env.BUILD_CONFIG }})
-        if: steps.cache-qt6.outputs.cache-hit != 'true' && env.QT_READY == 'true'
+        if: (success() || failure() || cancelled()) && steps.cache-qt6.outputs.cache-hit != 'true' && env.QT_READY == 'true'
         uses: actions/cache/save@v6
         with:
           path: |

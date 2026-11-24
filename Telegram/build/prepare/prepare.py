@@ -1090,7 +1090,9 @@ depends:patches/libvpx/*.patch
     git checkout v1.14.1
 win:
     for /r %%i in (..\\patches\\libvpx\\*) do call git apply %%i
+    python -c "from pathlib import Path; p1 = Path('build/make/gen_msvs_vcxproj.sh'); b1 = p1.read_bytes(); assert b'tag_content MultiProcessorCompilation true' in b1; p1.write_bytes(b1.replace(b'tag_content MultiProcessorCompilation true', b'tag_content MultiProcessorCompilation true\\n                tag_content DebugInformationFormat OldStyle')); p2 = Path('build/make/gen_msvs_sln.sh'); b2 = p2.read_bytes(); assert b'MSBUILD_TOOL := msbuild.exe' in b2 and b'-m -t:Build' in b2; p2.write_bytes(b2.replace(b'MSBUILD_TOOL := msbuild.exe', b'.NOTPARALLEL:\\nMSBUILD_TOOL := msbuild.exe').replace(b'-m -t:Build', b'-m -nodeReuse:false -t:Build'))"
 
+    SET MSBUILDDISABLENODEREUSE=1
     SET PATH=%THIRDPARTY_DIR%\\msys64\\usr\\bin;%PATH%
     SET CHERE_INVOKING=enabled_from_arguments
     SET MSYS2_PATH_TYPE=inherit
