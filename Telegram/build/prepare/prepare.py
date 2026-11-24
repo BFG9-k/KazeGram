@@ -550,6 +550,7 @@ win:
     msys64.exe
     del msys64.exe
 
+    bash -c "sed -i 's|https://mirror.msys2.org|https://repo.msys2.org|g' /etc/pacman.d/mirrorlist.*"
     bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
     pacman -Syu --noconfirm ^
         make ^
@@ -578,7 +579,7 @@ win:
 stage('jom', """
 win:
     powershell -Command "iwr -OutFile ./jom.zip https://master.qt.io/official_releases/jom/jom_1_1_3.zip"
-    powershell -Command "Expand-Archive ./jom.zip"
+    python -m zipfile -e jom.zip jom
     del jom.zip
 """, 'ThirdParty')
 
@@ -1034,8 +1035,9 @@ mac:
 """)
 
 stage('libjxl', """
-    git clone -b v0.12.0 --recursive https://github.com/libjxl/libjxl.git
+    git clone -b v0.12.0 https://github.com/libjxl/libjxl.git
     cd libjxl
+    git submodule update --init --recursive
     cd third_party
     cd brotli
     git checkout v1.2.1
@@ -1087,7 +1089,7 @@ depends:patches/libvpx/*.patch
     cd libvpx
     git checkout v1.14.1
 win:
-    for /r %%i in (..\\patches\\libvpx\\*) do git apply %%i
+    for /r %%i in (..\\patches\\libvpx\\*) do call git apply %%i
 
     SET PATH=%THIRDPARTY_DIR%\\msys64\\usr\\bin;%PATH%
     SET CHERE_INVOKING=enabled_from_arguments
@@ -1646,7 +1648,7 @@ win:
         )
     )
     cd ..\\qtsvg
-    for %%i in (..\\..\\patches\\qtsvg_%QT%\\*) do git apply %%i -v || exit /b 1
+    for %%i in (..\\..\\patches\\qtsvg_%QT%\\*) do call git apply %%i -v || exit /b 1
     cd ..
 
     SET CONFIGURATIONS=-debug

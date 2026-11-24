@@ -6,6 +6,9 @@
 
 add_executable(Telegram WIN32 MACOSX_BUNDLE)
 init_non_host_target(Telegram)
+if (MSVC)
+    set_property(TARGET Telegram PROPERTY MSVC_DEBUG_INFORMATION_FORMAT Embedded)
+endif()
 
 add_subdirectory(lib_rpl)
 add_subdirectory(lib_crl)
