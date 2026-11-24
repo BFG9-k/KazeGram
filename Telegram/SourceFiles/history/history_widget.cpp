@@ -118,7 +118,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/view/controls/compose_controls_common.h"
 #include "history/view/controls/history_view_characters_limit.h"
-#include "history/view/controls/history_view_compose_ai_button.h"
 #include "history/view/controls/history_view_compose_ai_tooltip.h"
 #include "history/view/controls/history_view_bot_menu_hold.h"
 #include "history/view/controls/history_view_compose_search.h"
@@ -295,9 +294,6 @@ HistoryWidget::HistoryWidget(
 	? object_ptr<Support::Autocomplete>(this, &session())
 	: nullptr)
 , _send(std::make_shared<Ui::SendButton>(this, st::historySend))
-, _aiButton(Ui::CreateChild<HistoryView::Controls::ComposeAiButton>(
-	this,
-	st::historyAiComposeButton))
 , _sendAsFile(Ui::CreateChild<Ui::IconButton>(
 	this,
 	st::historySendAsFileButton))
@@ -518,7 +514,6 @@ HistoryWidget::HistoryWidget(
 	}, _field->lifetime());
 	Data::AmPremiumValue(&session()) | rpl::on_next([=] {
 		checkCharsLimitation();
-		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
 		updateSendButtonType();
@@ -590,7 +585,6 @@ HistoryWidget::HistoryWidget(
 	InitMessageFieldFade(_field, st::historyComposeField.textBg);
 
 	setupFastButtonMode();
-	initAiButton();
 	initSendAsFileButton();
 	initExpandButton();
 	initDiscardRichDraftButton();
@@ -1460,7 +1454,6 @@ void HistoryWidget::initVoiceRecordBar() {
 	) | rpl::on_next([=](bool active) {
 		_field->setDisabled(active);
 		controller()->widget()->setInnerFocus();
-		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
 		if (_stash) {
@@ -1469,25 +1462,6 @@ void HistoryWidget::initVoiceRecordBar() {
 	}, _recordingStateLifetime);
 
 	_voiceRecordBar->hideFast();
-}
-
-void HistoryWidget::initAiButton() {
-	_aiButton->hide();
-	_aiButton->setAccessibleName(tr::lng_ai_compose_title(tr::now));
-	_aiButton->setClickedCallback([=] {
-		if (_aiTooltipManager) {
-			_aiTooltipManager->hideAndRemember();
-		}
-		updateAiButtonVisibility();
-		showAiComposeBox();
-	});
-
-	_aiTooltipManager = std::make_unique<HistoryView::Controls::AiTooltipManager>(
-		this,
-		_aiButton,
-		tr::lng_ai_compose_tooltip(tr::rich),
-		"ai_compose_tooltip_hidden"_cs,
-		[=] { return width(); });
 }
 
 void HistoryWidget::initSendAsFileButton() {
@@ -2224,7 +2198,6 @@ void HistoryWidget::applyInlineBotQuery(UserData *bot, const QString &query) {
 void HistoryWidget::orderWidgets() {
 	_voiceRecordBar->raise();
 	_send->raise();
-	_aiButton->raise();
 	_sendAsFile->raise();
 	_expand->raise();
 	_richDraftPreview->raise();
@@ -2278,9 +2251,6 @@ void HistoryWidget::orderWidgets() {
 	}
 	if (_attachBotsMenu) {
 		_attachBotsMenu->raise();
-	}
-	if (_aiTooltipManager) {
-		_aiTooltipManager->raise();
 	}
 	if (_sendAsFileTooltipManager) {
 		_sendAsFileTooltipManager->raise();
@@ -2378,7 +2348,6 @@ void HistoryWidget::fieldChanged() {
 		updateControlsVisibility();
 		updateControlsGeometry();
 	}
-	updateAiButtonVisibility();
 	updateSendAsFileVisibility();
 	updateExpandButtonVisibility();
 
@@ -4642,7 +4611,6 @@ void HistoryWidget::updateControlsVisibility() {
 		updateControlsGeometry();
 		update();
 	}
-	updateAiButtonVisibility();
 	updateSendAsFileVisibility();
 	updateExpandButtonVisibility();
 	updateDiscardRichDraftVisibility();
@@ -5594,49 +5562,6 @@ void HistoryWidget::setupSendMenu(
 				action(value, details);
 			}
 		});
-}
-
-void HistoryWidget::showAiComposeBox() {
-	const auto text = prepareTextForEditMsg();
-	if (text.text.isEmpty()) {
-		return;
-	}
-	auto send = Fn<void(TextWithEntities &&, Api::SendOptions, Fn<void()>)>(
-		nullptr);
-	auto setupMenu = Fn<void(
-		not_null<Ui::RpWidget*>,
-		Fn<void(Api::SendOptions)>)>(nullptr);
-	if (_list && canSendAiComposeDirect()) {
-		send = crl::guard(_list, [=](
-				TextWithEntities result,
-				Api::SendOptions options,
-				Fn<void()> done) {
-			sendWithTextOverride(std::move(result), options, std::move(done));
-		});
-		setupMenu = crl::guard(_list, [=](
-				not_null<Ui::RpWidget*> button,
-				Fn<void(Api::SendOptions)> sendCallback) {
-			setupSendMenu(
-				button,
-				SendMenu::DefaultCallback(
-					controller()->uiShow(),
-					sendCallback));
-		});
-	}
-	HistoryView::Controls::ShowComposeAiBox(controller()->uiShow(), {
-		.session = &session(),
-		.text = text,
-		.chatStyle = _fieldChatStyle,
-		.apply = crl::guard(this, [=](const TextWithEntities &result) {
-			const auto action = Ui::InputField::HistoryAction::NewEntry;
-			setFieldText({
-				result.text,
-				TextUtilities::ConvertEntitiesToTextTags(result.entities),
-			}, TextUpdateEvent::SaveDraft, action);
-		}),
-		.send = std::move(send),
-		.setupMenu = std::move(setupMenu),
-	});
 }
 
 void HistoryWidget::triggerAiApplyInPlace() {
@@ -7345,7 +7270,6 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 		}
 	}
 	updateControlsGeometry();
-	updateAiButtonVisibility();
 	updateSendAsFileVisibility();
 	updateExpandButtonVisibility();
 	updateFieldPlaceholder();
@@ -7507,12 +7431,6 @@ bool HistoryWidget::hideExtraButtons() const {
 		|| shouldShowRichDraftPreview();
 }
 
-bool HistoryWidget::hasEnoughLinesForAi() const {
-	return _history
-		&& !_voiceRecordBar->isActive()
-		&& Ui::HasEnoughLinesForAi(&session(), _field);
-}
-
 bool HistoryWidget::hasEnoughLinesForExpand() const {
 	return _history
 		&& !_voiceRecordBar->isActive()
@@ -7524,23 +7442,6 @@ bool HistoryWidget::textExceedsMaxSize() const {
 		&& !_voiceRecordBar->isActive()
 		&& (_field->getLastText().size()
 			> Data::PremiumLimits(&session()).messageLengthCurrent());
-}
-
-void HistoryWidget::updateAiButtonVisibility() {
-	const auto hidden = !hasEnoughLinesForAi()
-		|| !_send->isVisible()
-		|| !_field->isVisible();
-	if (_aiButton->isHidden() == hidden) {
-		return;
-	}
-	const auto shown = !hidden;
-	_aiButton->setVisible(shown);
-	if (shown) {
-		updateAiButtonGeometry();
-	}
-	if (_aiTooltipManager) {
-		_aiTooltipManager->updateVisibility(shown);
-	}
 }
 
 bool HistoryWidget::canShowRichEditor() const {
@@ -7623,18 +7524,6 @@ void HistoryWidget::updateDiscardRichDraftGeometry() {
 	const auto y = _richDraftPreview->y()
 		+ st::historyAiComposeButtonPosition.y();
 	_discardRichDraft->move(x, y);
-}
-
-void HistoryWidget::updateAiButtonGeometry() {
-	if (_aiButton->isHidden()) {
-		return;
-	}
-	const auto x = _attachToggle->x() - st::historyAiComposeButtonPosition.x();
-	const auto y = _field->y() + st::historyAiComposeButtonPosition.y();
-	_aiButton->move(x, y);
-	if (_aiTooltipManager) {
-		_aiTooltipManager->updateGeometry();
-	}
 }
 
 void HistoryWidget::updateSendAsFileVisibility() {
@@ -7735,7 +7624,6 @@ void HistoryWidget::moveFieldControls() {
 	if (_ttlInfo) {
 		_ttlInfo->move(width() - right - _ttlInfo->width(), buttonsBottom);
 	}
-	updateAiButtonGeometry();
 	updateSendAsFileGeometry();
 	updateExpandButtonGeometry();
 	updateDiscardRichDraftGeometry();
@@ -7845,7 +7733,6 @@ void HistoryWidget::inlineBotChanged() {
 
 void HistoryWidget::fieldResized() {
 	moveFieldControls();
-	updateAiButtonVisibility();
 	updateSendAsFileVisibility();
 	updateExpandButtonVisibility();
 	updateHistoryGeometry();

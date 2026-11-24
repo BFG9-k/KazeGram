@@ -23,8 +23,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_msg_id.h"
 #include "data/data_types.h"
 #include "dialogs/ui/dialogs_pill.h"
-#include "history/view/controls/history_view_compose_ai_button.h"
-#include "boxes/compose_ai_box.h"
 #include "ui/emoji_config.h"
 #include "ui/painter.h"
 #include "chat_helpers/tabbed_selector.h"
@@ -38,7 +36,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_send_details.h"
 #include "styles/style_settings.h"
 #include "ui/boxes/confirm_box.h"
-#include "ui/controls/compose_ai_button_factory.h"
 #include "ui/controls/send_button.h"
 #include "ui/delayed_activation.h"
 #include "ui/effects/premium_graphics.h"
@@ -1593,9 +1590,6 @@ public:
 private:
 	void setupWindow(ShowWindowDescriptor &&descriptor);
 	void setupEmojiColumn(const ShowWindowDescriptor &descriptor);
-	void setupBottomAiStar(
-		not_null<HistoryView::Controls::ComposeAiButton*> button,
-		not_null<Main::Session*> session);
 	void layout();
 	void updateBottomMask();
 	void toggleEmojiColumn();
@@ -1629,7 +1623,6 @@ private:
 	object_ptr<Toolbar> _toolbar = { nullptr };
 	object_ptr<ToolbarPill> _discard = { nullptr };
 	object_ptr<ToolbarPill> _cancel = { nullptr };
-	object_ptr<ToolbarPill> _aiPill = { nullptr };
 	object_ptr<Ui::SendButton> _send = { nullptr };
 	Ui::RpWidget *_sendLock = nullptr;
 	object_ptr<ChatHelpers::TabbedSelector> _emojiColumn = { nullptr };
@@ -1804,82 +1797,6 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 			}
 		});
 	}
-	if (!base::options::value<bool>(Ui::kOptionHideAiButton)) {
-		const auto session = descriptor.session;
-		_aiPill = object_ptr<ToolbarPill>(
-			_bottom.data(),
-			st::ivEditorPillShadow);
-		auto owned = object_ptr<HistoryView::Controls::ComposeAiButton>(
-			_aiPill.data(),
-			st::ivEditorToolbarButton,
-			st::ivEditorBottomAiIcon,
-			st::ivEditorBottomAiStar1,
-			st::ivEditorBottomAiStar2);
-		const auto button = owned.data();
-		_aiPill->addButton(std::move(owned), st::ivEditorToolbarButton);
-		button->setAccessibleName(tr::lng_ai_compose_title(tr::now));
-		button->setClickedCallback([=] {
-			const auto premiumRequired = [=] {
-				if (SessionPremium(session)) {
-					return false;
-				}
-				ShowRichMessagesPremiumToast(_show);
-				return true;
-			};
-			const auto editor = _editor;
-			if (editor && editor->hasActiveSelection()) {
-				auto span = editor->textSpanForCurrentSelection();
-				if (!span.text.isEmpty()) {
-					if (premiumRequired()) {
-						return;
-					}
-					HistoryView::Controls::ShowComposeAiBox(_show, {
-						.session = session,
-						.text = std::move(span),
-						.apply = [editor](TextWithEntities result) {
-							if (!editor || result.text.isEmpty()) {
-								return;
-							}
-							editor->replaceCurrentSelectionWithText(
-								std::move(result));
-						},
-						.allowPrompt = true,
-					});
-					return;
-				}
-				auto source = editor->richPageForCurrentSelection();
-				if (source && !source->blocks.empty()) {
-					if (premiumRequired()) {
-						return;
-					}
-					HistoryView::Controls::ShowComposeAiBox(_show, {
-						.session = session,
-						.richSource = std::move(source),
-						.applyRich = [editor](
-								std::shared_ptr<const RichPage> page) {
-							if (!editor || !page || page->blocks.empty()) {
-								return;
-							}
-							editor->replaceCurrentSelectionWithRichPage(
-								std::move(page));
-						},
-						.allowPrompt = true,
-					});
-					return;
-				}
-			}
-			ShowCreateAiBox(_show, {
-				.session = session,
-				.applyToPage = [editor](std::shared_ptr<const RichPage> page) {
-					if (!editor || !page || page->blocks.empty()) {
-						return;
-					}
-					editor->insertPreparedBlocks(page->blocks);
-				},
-			});
-		});
-		setupBottomAiStar(button, session);
-	}
 	_send = object_ptr<Ui::SendButton>(
 		_bottom.data(),
 		save ? st::ivEditorBottomSaveSend : st::ivEditorBottomSend);
@@ -2018,37 +1935,6 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 	_initialPage = _state->richPage();
 }
 
-void WindowHost::Impl::setupBottomAiStar(
-		not_null<HistoryView::Controls::ComposeAiButton*> button,
-		not_null<Main::Session*> session) {
-	const auto editor = not_null<Widget*>(_editor.data());
-	const auto locked = button->lifetime().make_state<bool>(false);
-	const auto refresh = [=] {
-		if (!*locked) {
-			button->setPremiumStar(QImage(), QPoint(), 0);
-		} else {
-			const auto side = st::ivEditorToolbarPremiumStarSize;
-			const auto skip = st::ivEditorToolbarPremiumStarSkip;
-			button->setPremiumStar(
-				PremiumStarImage(),
-				QPoint(
-					button->width() - side - skip.x(),
-					button->height() - side - skip.y()),
-				st::ivEditorToolbarPremiumStarOutline);
-		}
-	};
-	rpl::combine(
-		AmPremiumValue(session),
-		editor->hasSelectionValue()
-	) | rpl::on_next([=](bool premium, bool selection) {
-		*locked = (selection && !premium);
-		refresh();
-	}, button->lifetime());
-	style::PaletteChanged() | rpl::on_next([=] {
-		refresh();
-	}, button->lifetime());
-}
-
 void WindowHost::Impl::setupEmojiColumn(const ShowWindowDescriptor &descriptor) {
 	using Selector = ChatHelpers::TabbedSelector;
 	_emojiColumnShadow = object_ptr<Ui::PlainShadow>(_window->body().get());
@@ -2145,7 +2031,6 @@ void WindowHost::Impl::layout() {
 	_bottomFade->setGeometry(0, height - bottomHeight, editorWidth, bottomHeight);
 	_bottom->setGeometry(0, height - bottomHeight, editorWidth, bottomHeight);
 	const auto right = editorWidth - padding.right();
-	const auto left = padding.left();
 	const auto leftPill = _discard
 		? _discard.data()
 		: _cancel.data();
@@ -2166,12 +2051,6 @@ void WindowHost::Impl::layout() {
 				- _send->width()
 				- st::ivEditorToolbarGroupsSkip
 				- leftPill->naturalSize().width(),
-			buttonsTop,
-			editorWidth);
-	}
-	if (_aiPill) {
-		_aiPill->moveToLeft(
-			left - _aiPill->shadowMargins().left(),
 			buttonsTop,
 			editorWidth);
 	}
@@ -2229,7 +2108,6 @@ void WindowHost::Impl::updateBottomMask() {
 	};
 	addMask(_discard.data());
 	addMask(_cancel.data());
-	addMask(_aiPill.data());
 	addMask(_send.data());
 	addMask(_sendLock);
 	if (bottomMask.isEmpty()) {

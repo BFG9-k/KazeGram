@@ -83,7 +83,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
 #include "history/view/controls/history_view_characters_limit.h"
-#include "history/view/controls/history_view_compose_ai_button.h"
 #include "history/view/controls/history_view_compose_ai_tooltip.h"
 #include "history/view/controls/history_view_bot_menu_hold.h"
 #include "history/view/controls/history_view_compose_media_edit_manager.h"
@@ -1225,9 +1224,6 @@ ComposeControls::ComposeControls(
 , _mode(descriptor.mode)
 , _wrap(std::make_unique<Ui::RpWidget>(_parent))
 , _send(std::make_shared<Ui::SendButton>(_wrap.get(), _st.send))
-, _aiButton(Ui::CreateChild<Controls::ComposeAiButton>(
-	_wrap.get(),
-	st::historyAiComposeButton))
 , _sendAsFile(_features.attachments
 	? Ui::CreateChild<Ui::IconButton>(
 		_wrap.get(),
@@ -2426,9 +2422,6 @@ void ComposeControls::showStarted() {
 	if (_autocomplete) {
 		_autocomplete->hideFast();
 	}
-	if (_aiTooltipManager) {
-		_aiTooltipManager->hideFast();
-	}
 	if (_sendAsFileTooltipManager) {
 		_sendAsFileTooltipManager->hideFast();
 	}
@@ -2453,15 +2446,11 @@ void ComposeControls::showFinished() {
 		_autocomplete->hideFast();
 	}
 	updateWrappingVisibility();
-	_aiButton->raise();
 	if (_sendAsFile) {
 		_sendAsFile->raise();
 	}
 	_expand->raise();
 	_discardRichDraft->raise();
-	if (_aiTooltipManager) {
-		_aiTooltipManager->showFinished();
-	}
 	if (_sendAsFileTooltipManager) {
 		_sendAsFileTooltipManager->showFinished();
 	}
@@ -2483,9 +2472,6 @@ void ComposeControls::raisePanels() {
 	}
 	if (_emojiSuggestions) {
 		_emojiSuggestions->raise();
-	}
-	if (_aiTooltipManager) {
-		_aiTooltipManager->raise();
 	}
 	if (_sendAsFileTooltipManager) {
 		_sendAsFileTooltipManager->raise();
@@ -2879,7 +2865,6 @@ void ComposeControls::init() {
 	initField();
 	initTabbedSelector();
 	initSendButton();
-	initAiButton();
 	initSendAsFileButton();
 	initExpandButton();
 	initDiscardRichDraftButton();
@@ -3271,20 +3256,17 @@ void ComposeControls::initField() {
 	_field->heightChanges(
 	) | rpl::on_next([=] {
 		updateHeight();
-		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
 	}, _field->lifetime());
 	_field->changes(
 	) | rpl::on_next([=] {
 		fieldChanged();
-		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
 	}, _field->lifetime());
 	Data::AmPremiumValue(&session()) | rpl::on_next([=] {
 		checkCharsLimitation();
-		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
 		updateSendLockBadge();
@@ -4501,7 +4483,6 @@ void ComposeControls::initVoiceRecordBar() {
 			_recording = false;
 			updateFieldVisibility();
 		}
-		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
 	}, _recordingStateLifetime);
@@ -4637,25 +4618,6 @@ void ComposeControls::initVoiceRecordBar() {
 				return true;
 			});
 	}, _voiceRecordBar->lifetime());
-}
-
-void ComposeControls::initAiButton() {
-	_aiButton->hide();
-	_aiButton->setAccessibleName(tr::lng_ai_compose_title(tr::now));
-	_aiButton->setClickedCallback([=] {
-		if (_aiTooltipManager) {
-			_aiTooltipManager->hideAndRemember();
-		}
-		updateAiButtonVisibility();
-		showAiComposeBox();
-	});
-
-	_aiTooltipManager = std::make_unique<Controls::AiTooltipManager>(
-		_parent,
-		_aiButton,
-		tr::lng_ai_compose_tooltip(tr::rich),
-		"ai_compose_tooltip_hidden"_cs,
-		[=] { return _wrap->width(); });
 }
 
 void ComposeControls::initSendAsFileButton() {
@@ -4908,7 +4870,6 @@ void ComposeControls::updateWrappingVisibility() {
 	}
 	_wrap->setVisible(!hidden && !restricted);
 	updateControlsParents();
-	updateAiButtonVisibility();
 	updateSendAsFileVisibility();
 	updateExpandButtonVisibility();
 	updateDiscardRichDraftVisibility();
@@ -5245,7 +5206,6 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 	if (_ttlInfo) {
 		_ttlInfo->move(size.width() - right - _ttlInfo->width(), buttonsTop);
 	}
-	updateAiButtonGeometry();
 	updateSendAsFileGeometry();
 	updateExpandButtonGeometry();
 	updateDiscardRichDraftGeometry();
@@ -5303,28 +5263,9 @@ void ComposeControls::updateControlsVisibility() {
 	if (_starsReaction) {
 		_starsReaction->show();
 	}
-	updateAiButtonVisibility();
 	updateSendAsFileVisibility();
 	updateExpandButtonVisibility();
 	updateDiscardRichDraftVisibility();
-}
-
-void ComposeControls::updateAiButtonVisibility() {
-	const auto hidden = !hasEnoughLinesForAi()
-		|| !_wrap->isVisible()
-		|| _recording.current()
-		|| !_field->isVisible();
-	if (_aiButton->isHidden() == hidden) {
-		return;
-	}
-	const auto shown = !hidden;
-	_aiButton->setVisible(shown);
-	if (shown) {
-		updateAiButtonGeometry();
-	}
-	if (_aiTooltipManager) {
-		_aiTooltipManager->updateVisibility(shown);
-	}
 }
 
 bool ComposeControls::canShowRichEditor() const {
@@ -5395,19 +5336,6 @@ void ComposeControls::updateDiscardRichDraftGeometry() {
 	_discardRichDraft->move(x, y);
 }
 
-void ComposeControls::updateAiButtonGeometry() {
-	if (_aiButton->isHidden()) {
-		return;
-	}
-	const auto anchorLeft = _attachToggle ? _attachToggle->x() : _field->x();
-	const auto x = anchorLeft - st::historyAiComposeButtonPosition.x();
-	const auto y = _field->y() + st::historyAiComposeButtonPosition.y();
-	_aiButton->move(x, y);
-	if (_aiTooltipManager) {
-		_aiTooltipManager->updateGeometry();
-	}
-}
-
 void ComposeControls::updateSendAsFileVisibility() {
 	if (!_sendAsFile) {
 		return;
@@ -5451,44 +5379,6 @@ bool ComposeControls::updateLikeShown() {
 	return false;
 }
 
-void ComposeControls::showAiComposeBox() {
-	const auto text = prepareTextForEditMsg();
-	if (text.text.isEmpty()) {
-		return;
-	}
-	auto send = Fn<void(TextWithEntities, Api::SendOptions, Fn<void()>)>();
-	auto setupMenu = Fn<void(
-		not_null<Ui::RpWidget*>,
-		Fn<void(Api::SendOptions)>)>();
-	if (canSendAiComposeDirect() && _sendWithText) {
-		send = crl::guard(_wrap.get(), [=](
-				TextWithEntities result,
-				Api::SendOptions options,
-				Fn<void()> done) {
-			_sendWithText(std::move(result), options, std::move(done));
-		});
-		setupMenu = crl::guard(_wrap.get(), [=](
-				not_null<Ui::RpWidget*> button,
-				Fn<void(Api::SendOptions)> sendCallback) {
-			setupSendMenu(button, sendCallback);
-		});
-	}
-	Controls::ShowComposeAiBox(_show, {
-		.session = _session,
-		.text = text,
-		.chatStyle = _chatStyle,
-		.apply = crl::guard(_wrap.get(), [=](TextWithEntities result) {
-			const auto action = Ui::InputField::HistoryAction::NewEntry;
-			setFieldText({
-				result.text,
-				TextUtilities::ConvertEntitiesToTextTags(result.entities),
-			}, TextUpdateEvent::SaveDraft, action);
-		}),
-		.send = std::move(send),
-		.setupMenu = std::move(setupMenu),
-	});
-}
-
 void ComposeControls::triggerAiApplyInPlace() {
 	if (!_session) {
 		return;
@@ -5516,12 +5406,6 @@ bool ComposeControls::canSendAiComposeDirect() const {
 		&& (_slowmodeSecondsLeft.current() == 0)
 		&& !_sendDisabledBySlowmode.current()
 		&& !shownStarsPerMessage();
-}
-
-bool ComposeControls::hasEnoughLinesForAi() const {
-	return _history
-		&& !_recording.current()
-		&& Ui::HasEnoughLinesForAi(&session(), _field);
 }
 
 bool ComposeControls::hasEnoughLinesForExpand() const {
@@ -5656,9 +5540,6 @@ void ComposeControls::updateOuterGeometry(QRect rect) {
 	}
 	if (_attachBotsMenu) {
 		_attachBotsMenu->moveToLeft(0, bottom - _attachBotsMenu->height());
-	}
-	if (_aiTooltipManager) {
-		_aiTooltipManager->updateGeometry();
 	}
 	if (_sendAsFileTooltipManager) {
 		_sendAsFileTooltipManager->updateGeometry();

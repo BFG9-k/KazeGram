@@ -32,7 +32,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/controls/history_view_characters_limit.h"
-#include "history/view/controls/history_view_compose_ai_button.h"
 #include "history/view/history_view_message.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
@@ -43,7 +42,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_media_prepare.h"
 #include "ui/chat/attach/attach_controls.h"
 #include "ui/chat/attach/attach_prepare.h"
-#include "ui/controls/compose_ai_button_factory.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/emoji_button_factory.h"
 #include "ui/effects/spoiler_mess.h"
@@ -521,25 +519,10 @@ void CaptionBox(
 
 	input->setTextWithTags(std::move(initialText));
 	input->setSubmitSettings(Core::App().settings().sendSubmitWay());
-	const auto chatStyle = InitMessageField(
+	InitMessageField(
 		controller,
 		input,
 		[=](not_null<DocumentData*>) { return true; });
-
-	const auto aiButton = Ui::SetupCaptionAiButton({
-		.parent = input->parentWidget(),
-		.field = input,
-		.session = &controller->session(),
-		.show = controller->uiShow(),
-		.chatStyle = chatStyle,
-	});
-	rpl::combine(
-		box->sizeValue(),
-		input->geometryValue()
-	) | rpl::on_next([=](QSize, QRect) {
-		Ui::UpdateCaptionAiButtonGeometry(aiButton, input);
-		aiButton->raise();
-	}, aiButton->lifetime());
 
 	const auto sendMenuDetails = [=] { return details; };
 	struct Autocomplete {

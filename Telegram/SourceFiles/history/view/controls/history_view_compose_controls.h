@@ -113,7 +113,6 @@ class VoiceRecordBar;
 class TTLButton;
 class WebpageProcessor;
 class CharactersLimitLabel;
-class ComposeAiButton;
 class ComposeTooltipManager;
 using AiTooltipManager = ComposeTooltipManager;
 class StashHintManager;
@@ -378,7 +377,6 @@ private:
 	void initKeyHandler();
 	void initLikeButton();
 	void initEditStarsButton();
-	void initAiButton();
 	void updateControlsParents();
 	void updateSubmitSettings();
 	void updateSendButtonType();
@@ -391,8 +389,6 @@ private:
 	void refreshSendGiftToggle();
 	void updateControlsVisibility();
 	void updateControlsGeometry(QSize size);
-	void updateAiButtonVisibility();
-	void updateAiButtonGeometry();
 	void initSendAsFileButton();
 	void fireSendTextAsFile(
 		const QString &fileText,
@@ -446,7 +442,6 @@ private:
 	void toggleTabbedSelectorMode();
 	void createTabbedPanel();
 	void setTabbedPanel(std::unique_ptr<ChatHelpers::TabbedPanel> panel);
-	void showAiComposeBox();
 	void triggerAiApplyInPlace();
 	[[nodiscard]] bool canSendAiComposeDirect() const;
 
@@ -460,7 +455,6 @@ private:
 	[[nodiscard]] bool hasVisibleSendText() const;
 	[[nodiscard]] bool hasSendableContent() const;
 	[[nodiscard]] bool hideExtraButtons() const;
-	[[nodiscard]] bool hasEnoughLinesForAi() const;
 	[[nodiscard]] bool hasEnoughLinesForExpand() const;
 	[[nodiscard]] bool textExceedsMaxSize() const;
 
@@ -565,7 +559,6 @@ private:
 
 	const std::shared_ptr<Ui::SendButton> _send;
 	rpl::event_stream<bool> _sendLockBadge;
-	Controls::ComposeAiButton * const _aiButton = nullptr;
 	Ui::IconButton * const _sendAsFile = nullptr;
 	Ui::IconButton * const _expand = nullptr;
 	Ui::IconButton * const _discardRichDraft = nullptr;
@@ -617,7 +610,6 @@ private:
 	friend class FieldHeader;
 	const std::unique_ptr<FieldHeader> _header;
 	const std::unique_ptr<Controls::VoiceRecordBar> _voiceRecordBar;
-	std::unique_ptr<Controls::AiTooltipManager> _aiTooltipManager;
 	std::unique_ptr<Controls::AiTooltipManager> _sendAsFileTooltipManager;
 	std::unique_ptr<Controls::StashHintManager> _stashHintManager;
 	std::shared_ptr<Ui::ChatStyle> _chatStyle;

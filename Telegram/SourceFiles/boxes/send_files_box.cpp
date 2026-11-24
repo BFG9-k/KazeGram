@@ -28,7 +28,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/video/video_editor_layer.h"
 #include "history/history_drag_area.h"
 #include "history/view/controls/history_view_characters_limit.h"
-#include "history/view/controls/history_view_compose_ai_button.h"
 #include "history/view/history_view_schedule_box.h"
 #include "core/click_handler_types.h"
 #include "core/mime_type.h"
@@ -55,7 +54,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/grouped_layout.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/controls/compose_ai_button_factory.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
@@ -241,7 +239,7 @@ void EditFileCaptionBox(
 			allow,
 			PremiumFeature::EmojiStatus);
 		if (controller) {
-			const auto chatStyle = InitMessageFieldHandlers({
+			InitMessageFieldHandlers({
 				.session = &controller->session(),
 				.show = controller->uiShow(),
 				.field = field,
@@ -252,20 +250,6 @@ void EditFileCaptionBox(
 				.allowPremiumEmoji = allow,
 				.fieldStyle = &st.files.caption,
 			});
-			const auto aiButton = Ui::SetupCaptionAiButton({
-				.parent = field->parentWidget(),
-				.field = field,
-				.session = &controller->session(),
-				.show = controller->uiShow(),
-				.chatStyle = chatStyle,
-			});
-			rpl::combine(
-				box->sizeValue(),
-				field->geometryValue()
-			) | rpl::on_next([=](QSize, QRect) {
-				Ui::UpdateCaptionAiButtonGeometry(aiButton, field);
-				aiButton->raise();
-			}, aiButton->lifetime());
 		}
 	}
 	field->setTextWithTags(std::move(currentCaption));
@@ -1567,10 +1551,6 @@ void SendFilesBox::updateCaptionVisibility() {
 	if (_emojiToggle) {
 		_emojiToggle->setVisible(can);
 	}
-	if (_aiButton) {
-		_aiButton->setVisible(can
-			&& Ui::HasEnoughLinesForAi(&_show->session(), _caption.data()));
-	}
 }
 
 void SendFilesBox::preparePreview() {
@@ -2294,7 +2274,7 @@ void SendFilesBox::setupCaption() {
 		return Data::AllowEmojiWithoutPremium(_toPeer, emoji);
 	};
 	const auto show = _show;
-	const auto chatStyle = InitMessageFieldHandlers({
+	InitMessageFieldHandlers({
 		.session = &show->session(),
 		.show = show,
 		.field = _caption.data(),
@@ -2368,14 +2348,6 @@ void SendFilesBox::setupCaption() {
 		checkCharsLimitation();
 		refreshMessagesCount();
 	}, _caption->lifetime());
-
-	_aiButton = Ui::SetupCaptionAiButton({
-		.parent = this,
-		.field = _caption.data(),
-		.session = &_show->session(),
-		.show = _show,
-		.chatStyle = chatStyle,
-	});
 }
 
 void SendFilesBox::setupCaptionAutocomplete() {
@@ -2756,10 +2728,6 @@ void SendFilesBox::updateControlsGeometry() {
 					- _emojiToggle->width()),
 				_caption->y() + st::boxAttachEmojiTop);
 			_emojiToggle->update();
-		}
-		if (_aiButton) {
-			Ui::UpdateCaptionAiButtonGeometry(_aiButton, _caption.data());
-			_aiButton->raise();
 		}
 	}
 	const auto pairs = std::array<std::pair<RpWidget*, int>, 4>{ {
