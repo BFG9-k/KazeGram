@@ -221,7 +221,7 @@ void ComputeInstallationTag() {
 
 bool MoveLegacyAlphaFolder(const QString &folder, const QString &file) {
 	const auto was = cExeDir() + folder;
-	const auto now = cExeDir() + u"TelegramForcePortable"_q;
+	const auto now = cExeDir() + u"KazeGramForcePortable"_q;
 	if (QDir(was).exists() && !QDir(now).exists()) {
 		const auto oldFile = was + "/tdata/" + file;
 		const auto newFile = was + "/tdata/alpha";
@@ -254,7 +254,12 @@ bool CheckPortableVersionFolder() {
 		return false;
 	}
 
-	const auto portable = cExeDir() + u"TelegramForcePortable"_q;
+	const auto primaryPortable = cExeDir() + u"KazeGramForcePortable"_q;
+	const auto legacyPortable = cExeDir() + u"TelegramForcePortable"_q;
+	const auto portable = (!QDir(primaryPortable).exists()
+		&& QDir(legacyPortable).exists())
+		? legacyPortable
+		: primaryPortable;
 	QFile key(portable + u"/tdata/alpha"_q);
 	if (cAlphaVersion()) {
 		Assert(*AlphaPrivateKey != 0);
@@ -343,7 +348,7 @@ void Launcher::init() {
 	prepareSettings();
 	initQtMessageLogging();
 
-	QApplication::setApplicationName(u"TelegramDesktop"_q);
+	QApplication::setApplicationName(u"KazeGramDesktop"_q);
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 	// fallback session management is useless for tdesktop since it doesn't have
