@@ -16,7 +16,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "ui/boxes/about_cocoon_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/layers/generic_box.h"
@@ -64,14 +63,7 @@ void SummaryHeader::update(not_null<Element*> view) {
 
 	const auto session = &item->history()->session();
 	const auto itemId = item->fullId();
-	_link = std::make_shared<LambdaClickHandler>([=](ClickContext context) {
-		if (Rect(iconRect().size()).contains(_iconRipple.lastPoint)) {
-			const auto my = context.other.value<ClickHandlerContext>();
-			if (const auto controller = my.sessionWindow.get()) {
-				controller->show(Box(Ui::AboutCocoonBox));
-				return;
-			}
-		}
+	_link = std::make_shared<LambdaClickHandler>([=](ClickContext) {
 		if (const auto item = session->data().message(itemId)) {
 			session->api().transcribes().toggleSummary(item);
 		}

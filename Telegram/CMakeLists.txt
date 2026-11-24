@@ -163,8 +163,6 @@ PRIVATE
     api/api_common.h
     api/api_confirm_phone.cpp
     api/api_confirm_phone.h
-    api/api_compose_with_ai.cpp
-    api/api_compose_with_ai.h
     api/api_credits.cpp
     api/api_credits.h
     api/api_credits_history_entry.cpp
@@ -437,14 +435,6 @@ PRIVATE
     boxes/stickers_box.h
     boxes/transfer_gift_box.cpp
     boxes/transfer_gift_box.h
-    boxes/compose_ai_box.cpp
-    boxes/compose_ai_box.h
-    boxes/create_ai_box.cpp
-    boxes/create_ai_box.h
-    boxes/create_ai_tone_box.cpp
-    boxes/create_ai_tone_box.h
-    boxes/preview_ai_tone_box.cpp
-    boxes/preview_ai_tone_box.h
     boxes/translate_box.cpp
     boxes/translate_box.h
     boxes/unconfirmed_auth_denied_box.cpp
@@ -704,8 +694,6 @@ PRIVATE
     data/data_abstract_sparse_ids.h
     data/data_abstract_structure.cpp
     data/data_abstract_structure.h
-    data/data_ai_compose_tones.cpp
-    data/data_ai_compose_tones.h
     data/data_audio_msg_id.cpp
     data/data_audio_msg_id.h
     data/data_auto_download.cpp

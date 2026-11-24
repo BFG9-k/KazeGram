@@ -20,7 +20,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/weak_ptr.h"
 #include "boxes/star_gift_box.h"
-#include "boxes/compose_ai_box.h"
 #include "boxes/edit_caption_box.h"
 #include "boxes/premium_preview_box.h"
 #include "boxes/send_files_box.h"
@@ -71,7 +70,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_global_privacy.h"
 #include "apiwrap.h"
 #include "api/api_chat_participants.h"
-#include "api/api_compose_with_ai.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/click_handler.h"
 #include "ui/color_int_conversion.h"
@@ -4586,15 +4584,6 @@ void ComposeControls::initVoiceRecordBar() {
 				return false;
 			});
 		}
-		_history
-			&& _field
-			&& _field->isVisible()
-			&& Data::CanSendTexts(_history->peer, !_topicRootId)
-			&& request->check(Command::ComposeAiApplyInPlace, 1)
-			&& request->handle([=] {
-				triggerAiApplyInPlace();
-				return true;
-			});
 		canShowRichEditor()
 			&& request->check(Command::ShowRichEditor, 1)
 			&& request->handle([=] {
@@ -5377,35 +5366,6 @@ bool ComposeControls::updateLikeShown() {
 		return true;
 	}
 	return false;
-}
-
-void ComposeControls::triggerAiApplyInPlace() {
-	if (!_session) {
-		return;
-	}
-	const auto field = _field;
-	Api::TriggerAiApplyInPlace(
-		_session,
-		_show,
-		_wrap.get(),
-		field,
-		prepareTextForEditMsg(),
-		crl::guard(_wrap.get(), [=](TextWithTags textWithTags, int cursor) {
-			setFieldText(
-				textWithTags,
-				TextUpdateEvent::SaveDraft,
-				Ui::InputField::HistoryAction::NewEntry);
-			field->setCursorPosition(cursor);
-		}));
-}
-
-bool ComposeControls::canSendAiComposeDirect() const {
-	using Type = Ui::SendButton::Type;
-	return _history
-		&& (computeSendButtonType() == Type::Send)
-		&& (_slowmodeSecondsLeft.current() == 0)
-		&& !_sendDisabledBySlowmode.current()
-		&& !shownStarsPerMessage();
 }
 
 bool ComposeControls::hasEnoughLinesForExpand() const {

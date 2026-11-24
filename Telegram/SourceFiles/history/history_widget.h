@@ -472,10 +472,6 @@ private:
 		std::shared_ptr<const Iv::RichPage> page,
 		Api::SendOptions options);
 	void sendVoice(const VoiceToSend &data);
-	void sendWithTextOverride(
-		TextWithEntities text,
-		Api::SendOptions options,
-		Fn<void()> done);
 	void send(Api::SendOptions options);
 	void sendWithModifiers(Qt::KeyboardModifiers modifiers);
 	void sendScheduled(Api::SendOptions initialOptions);
@@ -566,7 +562,6 @@ private:
 	// like send button, emoji button and others.
 	void moveFieldControls();
 	void updateFieldSize();
-	void triggerAiApplyInPlace();
 	void initSendAsFileButton();
 	void sendTextAsFile(
 		const QString &fileText,
@@ -583,7 +578,6 @@ private:
 	void initDiscardRichDraftButton();
 	void updateDiscardRichDraftVisibility();
 	void updateDiscardRichDraftGeometry();
-	[[nodiscard]] bool canSendAiComposeDirect() const;
 
 	[[nodiscard]] MsgId resolveReplyToTopicRootId();
 	[[nodiscard]] Data::ForumTopic *resolveReplyToTopic();

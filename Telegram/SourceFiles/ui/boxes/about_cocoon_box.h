@@ -11,7 +11,6 @@ namespace Ui {
 
 class GenericBox;
 
-void AboutCocoonBox(not_null<Ui::GenericBox*> box);
 void AddUniqueCloseButton(not_null<GenericBox*> box);
 
 } // namespace Ui

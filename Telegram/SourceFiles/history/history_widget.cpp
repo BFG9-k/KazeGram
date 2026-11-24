@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history_widget.h"
 
-#include "api/api_compose_with_ai.h"
 #include "api/api_editing.h"
 #include "api/api_bot.h"
 #include "api/api_chat_participants.h"
@@ -17,7 +16,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_send_progress.h"
 #include "api/api_unread_things.h"
 #include "base/random.h"
-#include "boxes/compose_ai_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/send_credits_box.h"
@@ -2748,13 +2746,6 @@ void HistoryWidget::setupShortcuts() {
 				using Scheduled = HistoryView::ScheduledMemento;
 				controller()->showSection(
 					std::make_shared<Scheduled>(_history));
-				return true;
-			});
-		_canSendTexts
-			&& _field->isVisible()
-			&& request->check(Command::ComposeAiApplyInPlace, 1)
-			&& request->handle([=] {
-				triggerAiApplyInPlace();
 				return true;
 			});
 		canShowRichEditor()
@@ -5564,22 +5555,6 @@ void HistoryWidget::setupSendMenu(
 		});
 }
 
-void HistoryWidget::triggerAiApplyInPlace() {
-	Api::TriggerAiApplyInPlace(
-		&session(),
-		controller()->uiShow(),
-		this,
-		_field,
-		prepareTextForEditMsg(),
-		crl::guard(this, [=](TextWithTags textWithTags, int cursor) {
-			setFieldText(
-				textWithTags,
-				TextUpdateEvent::SaveDraft,
-				Ui::InputField::HistoryAction::NewEntry);
-			_field->setCursorPosition(cursor);
-		}));
-}
-
 void HistoryWidget::saveEditMessage(Api::SendOptions options) {
 	Expects(_history != nullptr);
 
@@ -6079,20 +6054,6 @@ void HistoryWidget::sendTextWithTags(
 	}
 }
 
-void HistoryWidget::sendWithTextOverride(
-		TextWithEntities text,
-		Api::SendOptions options,
-		Fn<void()> done) {
-	if (!canSendAiComposeDirect()) {
-		return;
-	}
-	const auto useWebPageDraft = (text.text == prepareTextForEditMsg().text);
-	sendTextWithTags({
-		text.text,
-		TextUtilities::ConvertEntitiesToTextTags(text.entities),
-	}, useWebPageDraft, options, std::move(done));
-}
-
 void HistoryWidget::sendWithModifiers(Qt::KeyboardModifiers modifiers) {
 	send({ .handleSupportSwitch = Support::HandleSwitch(modifiers) });
 }
@@ -6159,16 +6120,6 @@ auto HistoryWidget::computeSendButtonType() const {
 			: Type::Record;
 	}
 	return Type::Send;
-}
-
-bool HistoryWidget::canSendAiComposeDirect() const {
-	using Type = Ui::SendButton::Type;
-	return _history
-		&& _peer
-		&& (computeSendButtonType() == Type::Send)
-		&& !_peer->slowmodeSecondsLeft()
-		&& !(_peer->slowmodeApplied() && _history->latestSendingMessage())
-		&& !_peer->starsPerMessageChecked();
 }
 
 SendMenu::Details HistoryWidget::sendButtonMenuDetails() const {

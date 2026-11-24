@@ -54,7 +54,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/welcome_messages.h"
 #include "data/stickers/data_stickers.h"
 #include "data/notify/data_notify_settings.h"
-#include "data/data_ai_compose_tones.h"
 #include "data/data_bot_app.h"
 #include "data/data_changes.h"
 #include "data/data_group_call.h"
@@ -335,7 +334,6 @@ Session::Session(not_null<Main::Session*> session)
 , _pollsClosingTimer([=] { checkPollsClosings(); })
 , _watchForOfflineTimer([=] { checkLocalUsersWentOffline(); })
 , _groups(this)
-, _aiComposeTones(std::make_unique<AiComposeTones>(session))
 , _chatsFilters(std::make_unique<ChatFilters>(this))
 , _cloudThemes(std::make_unique<CloudThemes>(session))
 , _sendActionManager(std::make_unique<SendActionManager>())
@@ -4563,21 +4561,6 @@ void Session::webpageApplyFields(
 		return nullptr;
 	};
 
-	const auto lookupComposeToneEmojiId = [&]() -> DocumentId {
-		if (const auto attributes = data.vattributes()) {
-			for (const auto &attribute : attributes->v) {
-				const auto result = attribute.match([&](
-						const MTPDwebPageAttributeAiComposeTone &data) {
-					return DocumentId(data.vemoji_id().v);
-				}, [](const auto &) { return DocumentId(0); });
-				if (result) {
-					return result;
-				}
-			}
-		}
-		return 0;
-	};
-
 	auto story = (Data::Story*)nullptr;
 	auto storyId = FullStoryId();
 	if (const auto attributes = data.vattributes()) {
@@ -4658,7 +4641,7 @@ void Session::webpageApplyFields(
 		lookupStickerSet(),
 		lookupUniqueGift(),
 		lookupAuction(),
-		lookupComposeToneEmojiId(),
+		DocumentId(0),
 		data.vduration().value_or_empty(),
 		qs(data.vauthor().value_or_empty()),
 		data.is_has_large_media(),
