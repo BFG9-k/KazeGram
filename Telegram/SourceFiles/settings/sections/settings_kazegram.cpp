@@ -271,7 +271,6 @@ void KazeGramSection::setupContent() {
 	}, colorTray->lifetime());
 
 	Ui::AddSkip(content);
-	Ui::AddDivider(content);
 
 	Ui::ResizeFitChild(this, content);
 }

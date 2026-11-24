@@ -40,7 +40,7 @@ PreLaunchWindow::PreLaunchWindow(QString title) {
 	setWindowIcon(Window::CreateIcon());
 	setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
 
-	setWindowTitle(title.isEmpty() ? u"Telegram"_q : title);
+	setWindowTitle(title.isEmpty() ? u"KazeGram"_q : title);
 
 	QPalette p(palette());
 	p.setColor(QPalette::Window, QColor(255, 255, 255));
@@ -245,7 +245,7 @@ NotStartedWindow::NotStartedWindow()
 : _label(this)
 , _log(this)
 , _close(this) {
-	_label.setText(u"Could not start Telegram Desktop!\nYou can see complete log below:"_q);
+	_label.setText(u"Could not start KazeGram Desktop!\nYou can see complete log below:"_q);
 
 	_log.setPlainText(Logs::full());
 
@@ -391,9 +391,9 @@ LastCrashedWindow::LastCrashedWindow(
 		[=] { networkSettings(); });
 
 	if (_sendingState == SendingNoReport) {
-		_label.setText(u"Last time Telegram Desktop was not closed properly."_q);
+		_label.setText(u"Last time KazeGram Desktop was not closed properly."_q);
 	} else {
-		_label.setText(u"Last time Telegram Desktop crashed :("_q);
+		_label.setText(u"Last time KazeGram Desktop crashed :("_q);
 	}
 
 	if (_updaterData) {
@@ -504,7 +504,7 @@ LastCrashedWindow::LastCrashedWindow(
 }
 
 void LastCrashedWindow::saveReport() {
-	QString to = QFileDialog::getSaveFileName(0, u"Telegram Crash Report"_q, QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + u"/report.telegramcrash"_q, u"Telegram crash report (*.telegramcrash)"_q);
+	QString to = QFileDialog::getSaveFileName(0, u"KazeGram Crash Report"_q, QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + u"/report.kazegramcrash"_q, u"KazeGram crash report (*.kazegramcrash)"_q);
 	if (!to.isEmpty()) {
 		QFile file(to);
 		if (file.open(QIODevice::WriteOnly)) {
@@ -912,7 +912,7 @@ void LastCrashedWindow::updateControls() {
 		h += _networkSettings.height() + padding;
 	}
 
-	QSize s(2 * padding + QFontMetrics(_label.font()).horizontalAdvance(u"Last time Telegram Desktop was not closed properly."_q) + padding + _networkSettings.width(), h);
+	QSize s(2 * padding + QFontMetrics(_label.font()).horizontalAdvance(u"Last time KazeGram Desktop was not closed properly."_q) + padding + _networkSettings.width(), h);
 	if (s == size()) {
 		resizeEvent(0);
 	} else {

@@ -28,11 +28,50 @@ constexpr auto kCloudLangPackName = "tdesktop"_cs;
 constexpr auto kCustomLanguage = "#custom"_cs;
 constexpr auto kLangValuesLimit = 20000;
 
+[[nodiscard]] QString RebrandClientValue(ushort key, QString value) {
+	value.replace(u"Telegram Desktop"_q, u"KazeGram Desktop"_q);
+	if (key == tr::lng_intro_about.base) {
+		value.replace(
+			u"official KazeGram Desktop"_q,
+			u"KazeGram Desktop"_q);
+		value.replace(
+			u"официальное приложение KazeGram Desktop"_q,
+			u"приложение KazeGram Desktop"_q);
+		return value;
+	}
+	switch (key) {
+	case tr::lng_open_from_tray.base:
+	case tr::lng_quit_from_tray.base:
+	case tr::lng_tray_icon_text.base:
+	case tr::lng_mac_menu_show.base:
+	case tr::lng_update_telegram.base:
+	case tr::lng_sure_save_language.base:
+	case tr::lng_settings_auto_start.base:
+	case tr::lng_settings_add_sendto.base:
+	case tr::lng_settings_passcode_lock_app.base:
+	case tr::lng_settings_use_winhello_about.base:
+	case tr::lng_passcode_winhello_unlock.base:
+	case tr::lng_passcode_unlock_about.base:
+	case tr::lng_local_storage_device_telegram.base:
+	case tr::lng_local_storage_device_usage.base:
+	case tr::lng_theme_editor_need_unlock.base:
+	case tr::lng_export_progress.base:
+	case tr::lng_screen_reader_bar_text.base:
+	case tr::lng_screen_reader_confirm_text.base:
+		value.replace(u"Telegram"_q, u"KazeGram"_q);
+		break;
+	default:
+		break;
+	}
+	return value;
+}
+
 std::vector<QString> PrepareDefaultValues() {
 	auto result = std::vector<QString>();
 	result.reserve(kKeysCount);
 	for (auto i = 0; i != kKeysCount; ++i) {
-		result.emplace_back(GetOriginalValue(ushort(i)));
+		result.emplace_back(
+			RebrandClientValue(ushort(i), GetOriginalValue(ushort(i))));
 	}
 	return result;
 }
@@ -297,7 +336,9 @@ void Instance::reset(const Language &data) {
 	_version = 0;
 	_nonDefaultValues.clear();
 	for (auto i = 0, count = int(_values.size()); i != count; ++i) {
-		_values[i] = GetOriginalValue(ushort(i));
+		_values[i] = RebrandClientValue(
+			ushort(i),
+			GetOriginalValue(ushort(i)));
 	}
 	ranges::fill(_nonDefaultSet, 0);
 	updateChoosingStickerReplacement();
@@ -732,6 +773,7 @@ QString Instance::getNonDefaultValue(const QByteArray &key) const {
 void Instance::applyValue(const QByteArray &key, const QByteArray &value) {
 	_nonDefaultValues[key] = value;
 	ParseKeyValue(key, value, [&](ushort key, QString &&value) {
+		value = RebrandClientValue(key, std::move(value));
 		_nonDefaultSet[key] = 1;
 		if (!_derived) {
 			_values[key] = std::move(value);
@@ -770,11 +812,13 @@ void Instance::resetValue(const QByteArray &key) {
 			const auto base = _base
 				? _base->getNonDefaultValue(key)
 				: QString();
-			_values[keyIndex] = !base.isEmpty()
-				? base
-				: GetOriginalValue(keyIndex);
+			_values[keyIndex] = RebrandClientValue(
+				keyIndex,
+				!base.isEmpty() ? base : GetOriginalValue(keyIndex));
 		} else if (!_derived->_nonDefaultSet[keyIndex]) {
-			_derived->_values[keyIndex] = GetOriginalValue(keyIndex);
+			_derived->_values[keyIndex] = RebrandClientValue(
+				keyIndex,
+				GetOriginalValue(keyIndex));
 		}
 		if (keyIndex == tr::lng_send_action_choose_sticker.base
 			|| keyIndex == tr::lng_user_action_choose_sticker.base) {
