@@ -32,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
+#include "kazegram/kazegram_memory.h"
 #include "history/view/history_view_draw_to_reply.h"
 #include "history/view/controls/history_view_bot_menu_button.h"
 #include "history/view/controls/history_view_compose_stash.h"
@@ -3733,6 +3734,7 @@ void HistoryWidget::setHistory(History *history) {
 		const auto wasMigrated = base::take(_migrated);
 		unloadHeavyViewParts(wasHistory);
 		unloadHeavyViewParts(wasMigrated);
+		KazeGram::TrackVisitedHistory(wasHistory);
 		if (const auto wasCreatingBotTopic = base::take(_creatingBotTopic).get()) {
 			if (wasCreatingBotTopic->creating()) {
 				wasCreatingBotTopic->forum()->discardCreatingId(
@@ -3743,6 +3745,7 @@ void HistoryWidget::setHistory(History *history) {
 	if (history) {
 		_history = history;
 		_migrated = _history ? _history->migrateFrom() : nullptr;
+		KazeGram::TrackVisitedHistory(_history);
 		registerDraftSource();
 		if (_history) {
 			setupPreview();

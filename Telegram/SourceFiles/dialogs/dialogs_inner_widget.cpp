@@ -385,6 +385,11 @@ InnerWidget::InnerWidget(
 	session().data().sendActionManager().animationUpdated(
 	) | rpl::on_next([=](
 			const Data::SendActionManager::AnimationUpdate &update) {
+		if (!update.textUpdated
+			&& _controller->isGifPausedAtLeastFor(
+				Window::GifPauseReason::Any)) {
+			return;
+		}
 		const auto updateRect = Ui::RowPainter::SendActionAnimationRect(
 			update.thread,
 			_filterId,
@@ -399,6 +404,9 @@ InnerWidget::InnerWidget(
 
 	session().data().sendActionManager().speakingAnimationUpdated(
 	) | rpl::on_next([=](not_null<History*> history) {
+		if (_controller->isGifPausedAtLeastFor(Window::GifPauseReason::Any)) {
+			return;
+		}
 		repaintDialogRowCornerStatus(history);
 	}, lifetime());
 

@@ -73,6 +73,7 @@ public:
 		bool spoiler);
 	[[nodiscard]] Image *getReplyPreview(not_null<HistoryItem*> item);
 	[[nodiscard]] bool replyPreviewLoaded(bool spoiler) const;
+	void clearReplyPreview();
 
 	void setRemoteLocation(
 		int32 dc,

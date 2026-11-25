@@ -17,16 +17,8 @@ namespace Ui {
 void ScheduleThanosEffectWarmUp(
 		not_null<Main::Session*> session,
 		rpl::lifetime &lifetime) {
-	if (session->data().chatsListLoaded(nullptr)) {
-		ThanosEffect::WarmUp();
-		return;
-	}
-	session->data().chatsListLoadedEvents(
-	) | rpl::filter([](Data::Folder *folder) {
-		return !folder;
-	}) | rpl::take(1) | rpl::on_next([] {
-		ThanosEffect::WarmUp();
-	}, lifetime);
+	(void)session;
+	(void)lifetime;
 }
 
 } // namespace Ui

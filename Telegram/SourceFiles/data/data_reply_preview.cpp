@@ -130,7 +130,7 @@ Image *ReplyPreview::image(
 					prepare(blurred, Images::Option::Blur);
 				}
 			}
-			if (_good) {
+			if (_good || (!loadThumbnail && image)) {
 				checked = true;
 				_photoMedia = nullptr;
 			}

@@ -1608,6 +1608,10 @@ bool DocumentData::replyPreviewLoaded(bool spoiler) const {
 	return _replyPreview->loaded(spoiler);
 }
 
+void DocumentData::clearReplyPreview() {
+	_replyPreview = nullptr;
+}
+
 StickerData *DocumentData::sticker() const {
 	return (type == StickerDocument)
 		? static_cast<StickerData*>(_additional.get())

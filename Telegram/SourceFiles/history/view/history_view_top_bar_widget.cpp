@@ -201,7 +201,10 @@ TopBarWidget::TopBarWidget(
 		using AnimationUpdate = Data::SendActionManager::AnimationUpdate;
 		session().data().sendActionManager().animationUpdated(
 		) | rpl::filter([=](const AnimationUpdate &update) {
-			return (update.thread == _activeChat.key.thread());
+			return (update.thread == _activeChat.key.thread())
+				&& (update.textUpdated
+					|| !_controller->isGifPausedAtLeastFor(
+						Window::GifPauseReason::Any));
 		}) | rpl::on_next([=] {
 			update();
 		}, lifetime());

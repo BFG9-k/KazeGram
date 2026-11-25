@@ -494,6 +494,8 @@ public:
 		not_null<HistoryView::ElementDelegate*> delegate,
 		int from,
 		int till);
+	void unloadAllHeavyViewParts();
+	void clearReplyPreviews();
 
 	void registerShownSpoiler(not_null<ViewElement*> view);
 	void hideShownSpoilers();

@@ -22,6 +22,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QThread>
 #include <QtCore/QFileInfo>
 
+#include <algorithm>
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -33,7 +35,13 @@ namespace Media {
 namespace Clip {
 namespace {
 
-constexpr auto kClipThreadsCount = 8;
+[[nodiscard]] int ClipThreadsCount() {
+	static const auto result = std::clamp(
+		QThread::idealThreadCount() / 2,
+		2,
+		4);
+	return result;
+}
 constexpr auto kAverageGifSize = 320 * 240;
 constexpr auto kWaitBeforeGifPause = crl::time(200);
 
@@ -221,7 +229,7 @@ Reader::Reader(const QByteArray &data, Callback &&callback)
 }
 
 void Reader::init(const Core::FileLocation &location, const QByteArray &data) {
-	if (Workers.size() < kClipThreadsCount) {
+	if (int(Workers.size()) < ClipThreadsCount()) {
 		_threadIndex = Workers.size();
 		Workers.push_back(std::make_unique<Worker>());
 	} else {

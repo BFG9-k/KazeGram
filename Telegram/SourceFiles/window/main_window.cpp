@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwidget.h" // session->content()->windowShown().
 #include "tray.h"
 #include "kazegram/kazegram_icon.h"
+#include "kazegram/kazegram_memory.h"
 #include "kazegram/kazegram_settings.h"
 #include "styles/style_window.h"
 #include "styles/style_dialogs.h" // ChildSkip().x() for new child windows.
@@ -527,6 +528,7 @@ bool MainWindow::hideNoQuit() {
 			if (const auto controller = sessionController()) {
 				controller->clearSectionStack();
 			}
+			KazeGram::NotifyWindowVisibilityChanged();
 			return true;
 		}
 	}
@@ -546,6 +548,7 @@ bool MainWindow::hideNoQuit() {
 	if (const auto controller = sessionController()) {
 		controller->clearSectionStack();
 	}
+	KazeGram::NotifyWindowVisibilityChanged();
 	return true;
 }
 
@@ -630,6 +633,7 @@ void MainWindow::handleStateChanged(Qt::WindowState state) {
 		minimizeToTray();
 	}
 	savePosition(state);
+	KazeGram::NotifyWindowVisibilityChanged();
 }
 
 void MainWindow::handleActiveChanged(bool active) {
@@ -653,6 +657,7 @@ void MainWindow::handleVisibleChanged(bool visible) {
 	}
 
 	handleVisibleChangedHook(visible);
+	KazeGram::NotifyWindowVisibilityChanged();
 }
 
 void MainWindow::showFromTray() {
@@ -1185,6 +1190,7 @@ bool MainWindow::minimizeToTray() {
 	closeWithoutDestroy();
 	controller().updateIsActiveBlur();
 	updateGlobalMenu();
+	KazeGram::NotifyWindowVisibilityChanged();
 	return true;
 }
 

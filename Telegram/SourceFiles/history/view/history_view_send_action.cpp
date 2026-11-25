@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_send_action.h"
 #include "data/data_forum_topic.h"
 #include "data/data_session.h"
+#include "kazegram/kazegram_memory.h"
 #include "main/main_session.h"
 #include "history/history.h"
 #include "lang/lang_instance.h" // Instance::supportChoosingStickerReplacement
@@ -386,9 +387,11 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 	}
 	const auto sendActionResult = !_typing.empty() || !_sendActions.empty();
 	const auto speakingResult = !_speaking.empty() || wasSpeakingAnimation;
+	const auto animateDots = !anim::Disabled()
+		&& KazeGram::HasActiveForegroundWindow();
 	if (force
 		|| sendActionChanged
-		|| (sendActionResult && !anim::Disabled())) {
+		|| (sendActionResult && animateDots)) {
 		const auto width = _sendActionAnimation.width() + _animationLeft;
 		_history->peer->owner().sendActionManager().updateAnimation({
 			_topic ? ((Data::Thread*)_topic) : _history,
@@ -398,7 +401,7 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 	}
 	if (force
 		|| speakingChanged
-		|| (speakingResult && !anim::Disabled())) {
+		|| (speakingResult && animateDots)) {
 		_history->peer->owner().sendActionManager().updateSpeakingAnimation({
 			_history
 		});

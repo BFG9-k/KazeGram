@@ -76,6 +76,8 @@ private:
 			MsgId,
 			std::weak_ptr<SendActionPainter>>> _painters;
 
+	crl::time _lastInactiveCheck = 0;
+
 };
 
 } // namespace Data

@@ -107,9 +107,14 @@ const QPixmap &Image::cached(
 	const auto size = outer.isEmpty() ? QSize(w, h) : outer * ratio;
 	const auto k = single ? SinglePixKey(args) : PixKey(w, h, args);
 	const auto i = _cache.find(k);
-	return (i != _cache.cend() && i->second.size() == size)
-		? i->second
-		: _cache.emplace_or_assign(k, prepare(w, h, args)).first->second;
+	if (i != _cache.cend() && i->second.size() == size) {
+		return i->second;
+	}
+	constexpr auto kMaxCachedPixmaps = 3;
+	if (_cache.size() >= kMaxCachedPixmaps) {
+		_cache.clear();
+	}
+	return _cache.emplace_or_assign(k, prepare(w, h, args)).first->second;
 }
 
 QPixmap Image::prepare(int w, int h, const Images::PrepareArgs &args) const {

@@ -594,6 +594,8 @@ void GifsListWidget::processHideFinished() {
 
 void GifsListWidget::processPanelHideFinished() {
 	clearHeavyData();
+	deleteUnusedGifLayouts();
+	deleteUnusedInlineLayouts();
 	if (_footer) {
 		_footer->clearHeavyData();
 	}

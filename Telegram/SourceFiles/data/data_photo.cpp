@@ -280,6 +280,10 @@ bool PhotoData::replyPreviewLoaded(bool spoiler) const {
 	return _replyPreview->loaded(spoiler);
 }
 
+void PhotoData::clearReplyPreview() {
+	_replyPreview = nullptr;
+}
+
 void PhotoData::setRemoteLocation(
 		int32 dc,
 		uint64 access,

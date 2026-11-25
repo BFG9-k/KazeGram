@@ -2014,6 +2014,7 @@ void StickersListWidget::clearHeavyIn(Set &set, bool clearSavedFrames) {
 		if (clearSavedFrames) {
 			sticker.savedFrame = QImage();
 			sticker.savedFrameFor = QSize();
+			sticker.premiumLock = QImage();
 		}
 		sticker.webm = nullptr;
 		sticker.lottie = nullptr;
@@ -3153,7 +3154,20 @@ void StickersListWidget::processPanelHideFinished() {
 	if (_localSetsManager->clearInstalledLocally()) {
 		refreshStickers();
 	}
-	clearHeavyData();
+	for (auto &set : _mySets) {
+		clearHeavyIn(set, true);
+	}
+	for (auto &set : _officialSets) {
+		clearHeavyIn(set, true);
+	}
+	for (auto &set : _searchSets) {
+		clearHeavyIn(set, true);
+	}
+	for (auto &set : _searchShortcutSets) {
+		clearHeavyIn(set, true);
+	}
+	_searchSwapBefore = QPixmap();
+	_searchSwapAfter = QPixmap();
 	if (_footer) {
 		_footer->clearHeavyData();
 	}

@@ -1530,6 +1530,8 @@ PRIVATE
     iv/iv_rich_page.h
     kazegram/kazegram_icon.cpp
     kazegram/kazegram_icon.h
+    kazegram/kazegram_memory.cpp
+    kazegram/kazegram_memory.h
     kazegram/kazegram_settings.cpp
     kazegram/kazegram_settings.h
     iv/iv_rich_page_quote.cpp

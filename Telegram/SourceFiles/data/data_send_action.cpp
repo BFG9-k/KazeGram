@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "history/history.h"
 #include "history/view/history_view_send_action.h"
+#include "kazegram/kazegram_memory.h"
 
 namespace Data {
 
@@ -115,6 +116,15 @@ void SendActionManager::repliesPaintersClear(
 }
 
 bool SendActionManager::callback(crl::time now) {
+	if (!KazeGram::HasActiveForegroundWindow()) {
+		if (_lastInactiveCheck
+			&& (now - _lastInactiveCheck < crl::time(500))) {
+			return !_sendActions.empty();
+		}
+		_lastInactiveCheck = now;
+	} else {
+		_lastInactiveCheck = 0;
+	}
 	for (auto i = begin(_sendActions); i != end(_sendActions);) {
 		const auto sendAction = lookupPainter(
 			i->first.first,
@@ -148,6 +158,7 @@ void SendActionManager::updateSpeakingAnimation(not_null<History*> history) {
 
 void SendActionManager::clear() {
 	_sendActions.clear();
+	_lastInactiveCheck = 0;
 }
 
 } // namespace Data

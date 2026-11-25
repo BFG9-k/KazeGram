@@ -2699,6 +2699,21 @@ void Session::unloadHeavyViewParts(
 	}
 }
 
+void Session::unloadAllHeavyViewParts() {
+	for (const auto &view : base::take(_heavyViewParts)) {
+		view->unloadHeavyPart();
+	}
+}
+
+void Session::clearReplyPreviews() {
+	for (const auto &[id, photo] : _photos) {
+		photo->clearReplyPreview();
+	}
+	for (const auto &[id, document] : _documents) {
+		document->clearReplyPreview();
+	}
+}
+
 void Session::registerShownSpoiler(not_null<ViewElement*> view) {
 	_shownSpoilers.emplace(view);
 }

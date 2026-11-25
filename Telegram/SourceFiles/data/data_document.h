@@ -180,6 +180,7 @@ public:
 		bool skipCover = false);
 	[[nodiscard]] Image *getReplyPreview(not_null<HistoryItem*> item);
 	[[nodiscard]] bool replyPreviewLoaded(bool spoiler) const;
+	void clearReplyPreview();
 
 	[[nodiscard]] StickerData *sticker() const;
 	[[nodiscard]] Data::FileOrigin stickerSetOrigin() const;

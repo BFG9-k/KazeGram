@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "menu/menu_ttl_validator.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/effects/thanos_effect.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -82,6 +83,9 @@ crl::time DeleteMessagesBox::layerAnimationDuration() const {
 }
 
 void DeleteMessagesBox::prepare() {
+	if (!_wipeHistoryPeer) {
+		Ui::ThanosEffect::WarmUp();
+	}
 	auto details = TextWithEntities();
 	const auto appendDetails = [&](TextWithEntities &&text) {
 		details.append(u"\n\n"_q).append(std::move(text));

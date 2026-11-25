@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "core/core_screenshot_protection.h"
 #include "core/core_settings.h"
+#include "kazegram/kazegram_memory.h"
 #include "core/update_checker.h"
 #include "core/shortcuts.h"
 #include "core/sandbox.h"
@@ -362,11 +363,13 @@ void Application::run() {
 		_mediaControlsManager = std::make_unique<MediaControlsManager>();
 	}
 
+	KazeGram::InitMemoryManager(_lifetime);
+
 	rpl::combine(
 		_batterySaving->value(),
 		settings().ignoreBatterySavingValue()
-	) | rpl::on_next([=](bool saving, bool ignore) {
-		PowerSaving::SetForceAll(saving && !ignore);
+	) | rpl::on_next([=](bool, bool) {
+		KazeGram::RefreshBackgroundPowerSaving();
 	}, _lifetime);
 
 	style::ShortAnimationPlaying(
