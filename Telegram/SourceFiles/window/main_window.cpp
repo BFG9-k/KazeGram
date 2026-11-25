@@ -644,6 +644,7 @@ void MainWindow::handleActiveChanged(bool active) {
 	if (const auto controller = sessionController()) {
 		controller->session().updates().updateOnline();
 	}
+	KazeGram::NotifyWindowActiveChanged();
 }
 
 void MainWindow::handleVisibleChanged(bool visible) {

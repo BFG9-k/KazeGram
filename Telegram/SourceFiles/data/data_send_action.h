@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/timer.h"
 #include "ui/effects/animations.h"
 
 class History;
@@ -53,9 +54,12 @@ public:
 		not_null<History*> history,
 		not_null<UserData*> user);
 
+	void updateActiveWindowState();
 	void clear();
 
 private:
+	void updateSendActions(crl::time now);
+	void checkInactiveActions();
 	bool callback(crl::time now);
 	[[nodiscard]] SendActionPainter *lookupPainter(
 		not_null<History*> history,
@@ -66,6 +70,7 @@ private:
 		std::pair<not_null<History*>, MsgId>,
 		crl::time> _sendActions;
 	Ui::Animations::Basic _animation;
+	base::Timer _inactiveTimer;
 
 	rpl::event_stream<AnimationUpdate> _animationUpdate;
 	rpl::event_stream<not_null<History*>> _speakingAnimationUpdate;
@@ -75,8 +80,6 @@ private:
 		base::flat_map<
 			MsgId,
 			std::weak_ptr<SendActionPainter>>> _painters;
-
-	crl::time _lastInactiveCheck = 0;
 
 };
 

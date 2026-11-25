@@ -16,10 +16,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "data/data_chat.h"
 #include "data/data_peer.h"
+#include "data/data_send_action.h"
 #include "data/data_session.h"
 #include "data/data_thread.h"
 #include "dialogs/dialogs_key.h"
 #include "history/history.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
 #include "main/main_session.h"
 #include "mainwindow.h"
 #include "mainwidget.h"
@@ -55,9 +58,84 @@ struct ManagerState {
 
 	base::Timer cleanupTimer;
 	std::vector<HistoryLruEntry> historyLru;
+	bool hasVisibleUnminimized = true;
+	bool hasActiveForeground = true;
 };
 
 ManagerState *GlobalState = nullptr;
+
+void ForEachSession(const Fn<void(not_null<Main::Session*>)> &callback) {
+	if (!Core::IsAppLaunched() || Core::Quitting()) {
+		return;
+	}
+	auto sessions = base::flat_set<not_null<Main::Session*>>();
+	if (Core::App().domain().started()) {
+		for (const auto &entry : Core::App().domain().accounts()) {
+			if (entry.account && !entry.account->destroyingSession()) {
+				if (const auto session = entry.account->maybeSession()) {
+					sessions.emplace(session);
+				}
+			}
+		}
+	}
+	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
+		if (const auto sc = w->sessionController()) {
+			sessions.emplace(&sc->session());
+		}
+	});
+	for (const auto &session : sessions) {
+		callback(session);
+	}
+}
+
+void RecomputeWindowStates() {
+	if (!GlobalState || !Core::IsAppLaunched() || Core::Quitting()) {
+		return;
+	}
+	auto anyVisible = false;
+	auto anyActive = false;
+	auto hasWindows = false;
+	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
+		hasWindows = true;
+		const auto widget = w->widget();
+		const auto visible = widget->isVisible()
+			&& !(widget->windowState() & Qt::WindowMinimized);
+		if (visible) {
+			anyVisible = true;
+			if (widget->isActiveWindow()) {
+				anyActive = true;
+			}
+		}
+	});
+	GlobalState->hasVisibleUnminimized = !hasWindows || anyVisible;
+	const auto wasActive = GlobalState->hasActiveForeground;
+	const auto nowActive = !hasWindows || anyActive;
+	GlobalState->hasActiveForeground = nowActive;
+	if (wasActive != nowActive) {
+		ForEachSession([](not_null<Main::Session*> session) {
+			session->data().sendActionManager().updateActiveWindowState();
+		});
+	}
+}
+
+void PushHistoryLru(not_null<History*> history) {
+	if (!GlobalState) {
+		return;
+	}
+	const auto session = &history->session();
+	const auto peerId = history->peer->id;
+	auto &lru = GlobalState->historyLru;
+	lru.erase(
+		ranges::remove_if(lru, [&](const HistoryLruEntry &entry) {
+			const auto strong = entry.session.get();
+			return !strong || (strong == session && entry.peerId == peerId);
+		}),
+		end(lru));
+	lru.insert(begin(lru), HistoryLruEntry{
+		.session = base::make_weak(session),
+		.peerId = peerId,
+	});
+}
 
 [[nodiscard]] base::flat_set<not_null<History*>> CollectOpenHistories() {
 	auto result = base::flat_set<not_null<History*>>();
@@ -97,18 +175,16 @@ void PerformBackgroundCleanup() {
 		|| HasVisibleUnminimizedWindow()) {
 		return;
 	}
-	auto sessions = base::flat_set<not_null<Main::Session*>>();
 	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
 		if (const auto sc = w->sessionController()) {
 			sc->tabbedSelector()->hideFinished();
-			sessions.emplace(&sc->session());
 		}
 	});
-	for (const auto &session : sessions) {
+	ForEachSession([](not_null<Main::Session*> session) {
 		session->data().unloadAllHeavyViewParts();
 		session->data().clearReplyPreviews();
 		TrimBackgroundHistories(session, kMaxBackgroundHistories);
-	}
+	});
 	QPixmapCache::clear();
 	OptimizeProcessMemory();
 }
@@ -125,36 +201,17 @@ void InitMemoryManager(rpl::lifetime &appLifetime) {
 }
 
 bool HasVisibleUnminimizedWindow() {
-	if (!Core::IsAppLaunched() || Core::Quitting()) {
-		return true;
-	}
-	auto anyVisible = false;
-	auto hasWindows = false;
-	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
-		hasWindows = true;
-		const auto widget = w->widget();
-		if (widget->isVisible()
-			&& !(widget->windowState() & Qt::WindowMinimized)) {
-			anyVisible = true;
-		}
-	});
-	return !hasWindows || anyVisible;
+	return !GlobalState
+		|| !Core::IsAppLaunched()
+		|| Core::Quitting()
+		|| GlobalState->hasVisibleUnminimized;
 }
 
 bool HasActiveForegroundWindow() {
-	if (!Core::IsAppLaunched() || Core::Quitting()) {
-		return true;
-	}
-	auto anyActive = false;
-	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
-		const auto widget = w->widget();
-		if (widget->isActiveWindow()
-			&& widget->isVisible()
-			&& !(widget->windowState() & Qt::WindowMinimized)) {
-			anyActive = true;
-		}
-	});
-	return anyActive;
+	return !GlobalState
+		|| !Core::IsAppLaunched()
+		|| Core::Quitting()
+		|| GlobalState->hasActiveForeground;
 }
 
 void RefreshBackgroundPowerSaving() {
@@ -168,15 +225,23 @@ void RefreshBackgroundPowerSaving() {
 	PowerSaving::SetForceAll(forceByBattery || forceByHidden);
 }
 
+void NotifyWindowActiveChanged() {
+	if (!Core::IsAppLaunched() || Core::Quitting()) {
+		return;
+	}
+	RecomputeWindowStates();
+}
+
 void NotifyWindowVisibilityChanged() {
 	if (!Core::IsAppLaunched() || Core::Quitting()) {
 		return;
 	}
+	RecomputeWindowStates();
 	RefreshBackgroundPowerSaving();
 	if (!GlobalState) {
 		return;
 	}
-	if (HasVisibleUnminimizedWindow()) {
+	if (GlobalState->hasVisibleUnminimized) {
 		GlobalState->cleanupTimer.cancel();
 		Core::App().enumerateWindows([](not_null<Window::Controller*> w) {
 			const auto widget = w->widget();
@@ -223,24 +288,22 @@ void OptimizeProcessMemory() {
 #endif // Q_OS_WIN
 }
 
-void TrackVisitedHistory(History *history) {
-	if (!GlobalState || !history || Core::Quitting()) {
+void OnHistorySwitched(History *previous, History *current) {
+	if (!GlobalState || Core::Quitting() || (!previous && !current)) {
 		return;
 	}
-	const auto session = &history->session();
-	const auto peerId = history->peer->id;
-	auto &lru = GlobalState->historyLru;
-	lru.erase(
-		ranges::remove_if(lru, [&](const HistoryLruEntry &entry) {
-			const auto strong = entry.session.get();
-			return !strong || (strong == session && entry.peerId == peerId);
-		}),
-		end(lru));
-	lru.insert(begin(lru), HistoryLruEntry{
-		.session = base::make_weak(session),
-		.peerId = peerId,
-	});
-	TrimBackgroundHistories(session, kMaxActiveHistories);
+	if (previous && (previous != current)) {
+		PushHistoryLru(previous);
+	}
+	if (current) {
+		PushHistoryLru(current);
+	}
+	if (previous) {
+		TrimBackgroundHistories(&previous->session(), kMaxActiveHistories);
+	}
+	if (current && (!previous || (&current->session() != &previous->session()))) {
+		TrimBackgroundHistories(&current->session(), kMaxActiveHistories);
+	}
 }
 
 void TrimBackgroundHistories(

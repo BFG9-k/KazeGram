@@ -594,6 +594,8 @@ void Session::clear() {
 	_locations.clear();
 	_polls.clear();
 	_games.clear();
+	_documentsWithReplyPreview.clear();
+	_photosWithReplyPreview.clear();
 	_documents.clear();
 	_photos.clear();
 }
@@ -2705,11 +2707,29 @@ void Session::unloadAllHeavyViewParts() {
 	}
 }
 
+void Session::registerPhotoReplyPreview(not_null<PhotoData*> photo) {
+	_photosWithReplyPreview.emplace(photo);
+}
+
+void Session::unregisterPhotoReplyPreview(not_null<PhotoData*> photo) {
+	_photosWithReplyPreview.remove(photo);
+}
+
+void Session::registerDocumentReplyPreview(
+		not_null<DocumentData*> document) {
+	_documentsWithReplyPreview.emplace(document);
+}
+
+void Session::unregisterDocumentReplyPreview(
+		not_null<DocumentData*> document) {
+	_documentsWithReplyPreview.remove(document);
+}
+
 void Session::clearReplyPreviews() {
-	for (const auto &[id, photo] : _photos) {
+	for (const auto &photo : base::take(_photosWithReplyPreview)) {
 		photo->clearReplyPreview();
 	}
-	for (const auto &[id, document] : _documents) {
+	for (const auto &document : base::take(_documentsWithReplyPreview)) {
 		document->clearReplyPreview();
 	}
 }

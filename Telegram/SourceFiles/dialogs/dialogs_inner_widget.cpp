@@ -404,9 +404,6 @@ InnerWidget::InnerWidget(
 
 	session().data().sendActionManager().speakingAnimationUpdated(
 	) | rpl::on_next([=](not_null<History*> history) {
-		if (_controller->isGifPausedAtLeastFor(Window::GifPauseReason::Any)) {
-			return;
-		}
 		repaintDialogRowCornerStatus(history);
 	}, lifetime());
 

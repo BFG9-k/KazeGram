@@ -495,6 +495,10 @@ public:
 		int from,
 		int till);
 	void unloadAllHeavyViewParts();
+	void registerPhotoReplyPreview(not_null<PhotoData*> photo);
+	void unregisterPhotoReplyPreview(not_null<PhotoData*> photo);
+	void registerDocumentReplyPreview(not_null<DocumentData*> document);
+	void unregisterDocumentReplyPreview(not_null<DocumentData*> document);
 	void clearReplyPreviews();
 
 	void registerShownSpoiler(not_null<ViewElement*> view);
@@ -1284,6 +1288,8 @@ private:
 	base::flat_map<uint64, FullMsgId> _messageByRandomId;
 	base::flat_map<uint64, SentData> _sentMessagesData;
 
+	base::flat_set<not_null<PhotoData*>> _photosWithReplyPreview;
+	base::flat_set<not_null<DocumentData*>> _documentsWithReplyPreview;
 	std::unordered_map<
 		PhotoId,
 		std::unique_ptr<PhotoData>> _photos;

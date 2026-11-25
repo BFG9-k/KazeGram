@@ -23,6 +23,7 @@ namespace KazeGram {
 
 void InitMemoryManager(rpl::lifetime &appLifetime);
 void NotifyWindowVisibilityChanged();
+void NotifyWindowActiveChanged();
 
 [[nodiscard]] bool HasVisibleUnminimizedWindow();
 [[nodiscard]] bool HasActiveForegroundWindow();
@@ -30,7 +31,7 @@ void NotifyWindowVisibilityChanged();
 void RefreshBackgroundPowerSaving();
 void OptimizeProcessMemory();
 
-void TrackVisitedHistory(History *history);
+void OnHistorySwitched(History *previous, History *current);
 void TrimBackgroundHistories(
 	not_null<Main::Session*> session,
 	std::size_t keepCount);

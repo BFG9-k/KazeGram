@@ -341,6 +341,7 @@ DocumentData::DocumentData(not_null<Data::Session*> owner, DocumentId id)
 }
 
 DocumentData::~DocumentData() {
+	clearReplyPreview();
 	base::take(_thumbnail.loader).reset();
 	base::take(_videoThumbnail.loader).reset();
 	destroyLoader();
@@ -1589,6 +1590,7 @@ Image *DocumentData::getReplyPreview(
 		return nullptr;
 	} else if (!_replyPreview) {
 		_replyPreview = std::make_unique<Data::ReplyPreview>(this);
+		_owner->registerDocumentReplyPreview(this);
 	}
 	return _replyPreview->image(origin, context, spoiler);
 }
@@ -1609,7 +1611,10 @@ bool DocumentData::replyPreviewLoaded(bool spoiler) const {
 }
 
 void DocumentData::clearReplyPreview() {
-	_replyPreview = nullptr;
+	if (_replyPreview) {
+		base::take(_replyPreview).reset();
+		_owner->unregisterDocumentReplyPreview(this);
+	}
 }
 
 StickerData *DocumentData::sticker() const {

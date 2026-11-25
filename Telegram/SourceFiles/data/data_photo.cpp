@@ -46,6 +46,7 @@ PhotoData::PhotoData(not_null<Data::Session*> owner, PhotoId id)
 }
 
 PhotoData::~PhotoData() {
+	clearReplyPreview();
 	for (auto &image : _images) {
 		base::take(image.loader).reset();
 	}
@@ -263,6 +264,7 @@ Image *PhotoData::getReplyPreview(
 		bool spoiler) {
 	if (!_replyPreview) {
 		_replyPreview = std::make_unique<Data::ReplyPreview>(this);
+		_owner->registerPhotoReplyPreview(this);
 	}
 	return _replyPreview->image(origin, context, spoiler);
 }
@@ -281,7 +283,10 @@ bool PhotoData::replyPreviewLoaded(bool spoiler) const {
 }
 
 void PhotoData::clearReplyPreview() {
-	_replyPreview = nullptr;
+	if (_replyPreview) {
+		base::take(_replyPreview).reset();
+		_owner->unregisterPhotoReplyPreview(this);
+	}
 }
 
 void PhotoData::setRemoteLocation(

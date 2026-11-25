@@ -440,6 +440,7 @@ void Application::run() {
 		} else {
 			handleAppActivated();
 		}
+		KazeGram::NotifyWindowActiveChanged();
 	}, _lifetime);
 
 	DEBUG_LOG(("Application Info: window created..."));
@@ -486,6 +487,7 @@ void Application::run() {
 	processCreatedWindow(_lastActivePrimaryWindow);
 
 	_savedWindows->startRestore();
+	KazeGram::NotifyWindowVisibilityChanged();
 
 	Test::Fire(u"launch_finished"_q);
 	Test::Start();
@@ -1846,6 +1848,7 @@ void Application::closeWindow(not_null<Window::Controller*> window) {
 	if (_savedWindows) {
 		_savedWindows->scheduleSave();
 	}
+	KazeGram::NotifyWindowVisibilityChanged();
 }
 
 void Application::closeChatFromWindows(not_null<PeerData*> peer) {

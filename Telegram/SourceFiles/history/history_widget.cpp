@@ -3724,17 +3724,17 @@ void HistoryWidget::setHistory(History *history) {
 		}
 	};
 
+	auto wasHistory = (History*)nullptr;
 	if (_history) {
 		untrackThreadFieldVisibility();
 		unregisterDraftSources();
 		clearAllLoadRequests();
 		clearSupportPreloadRequest();
 		_historySponsoredPreloading.destroy();
-		const auto wasHistory = base::take(_history);
+		wasHistory = base::take(_history);
 		const auto wasMigrated = base::take(_migrated);
 		unloadHeavyViewParts(wasHistory);
 		unloadHeavyViewParts(wasMigrated);
-		KazeGram::TrackVisitedHistory(wasHistory);
 		if (const auto wasCreatingBotTopic = base::take(_creatingBotTopic).get()) {
 			if (wasCreatingBotTopic->creating()) {
 				wasCreatingBotTopic->forum()->discardCreatingId(
@@ -3745,7 +3745,6 @@ void HistoryWidget::setHistory(History *history) {
 	if (history) {
 		_history = history;
 		_migrated = _history ? _history->migrateFrom() : nullptr;
-		KazeGram::TrackVisitedHistory(_history);
 		registerDraftSource();
 		if (_history) {
 			setupPreview();
@@ -3755,6 +3754,7 @@ void HistoryWidget::setHistory(History *history) {
 			_preview = nullptr;
 		}
 	}
+	KazeGram::OnHistorySwitched(wasHistory, _history);
 	refreshAttachBotsMenu();
 }
 
